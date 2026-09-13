@@ -55,14 +55,16 @@ historique) → réponse → payload écran ou message chat privé.
 ## État 2026-09-13
 - [x] 0 dépôts GitHub publics `Nistroy/minecraft-ia` + `Nistroy/minecraft-ia-kb` ; `IA.md` retiré du dépôt serveur (PR #12)
 - [x] 2 cerveau + CLI (`serve`, `ask`, `extract`, `kb index`, `eval`), pytest + CI verts
-- [x] 3-4 mod serveur + client (1 jar), JUnit + CI verts ; jamais lancé en jeu
+- [x] 3-4 mod serveur + client (1 jar), JUnit + CI verts
 - [x] extraction réelle, 104 jars du serveur : 7 703 noms, 4 290 recettes
-- [x] 1 fiches : 1 par mod de contenu installé, agents + relecture par échantillon (dépôt kb, branche `docs/fiches-mods`)
-- [ ] clé Gemini (`~/.config/minecraft-ia/gemini-key`) + RPD réel lu dans AI Studio → `questions_per_player_per_day`, `llm_calls_per_day`
+- [x] 1 fiches : 1 par mod de contenu installé, agents + relecture par échantillon (kb PR #1 mergée)
+- [x] clé Gemini + limites réelles (429) → 6 questions/joueur/jour, 55 appels LLM/jour
+- [x] release `v0.1.0` + serveur (backup `pre-minecraft-ia_2026-09-13_22h10`, log : mod chargé, 0 nouvelle erreur) +
+  pack packwiz (`minecraft-server` PR #13) — 2026-09-13
+- [ ] test en jeu (`/ia` joueur seulement, pas testable en console) : touche `I`, écran, `/ia` chat, votes, quotas
 - [ ] jeu de questions test : `minecraft-ia-kb/eval/questions.toml` (6 amorces) + vraies questions des potes ; `eval` = 0 invention
-- [ ] release `v0.1.0` (tag → workflow release), test en jeu, puis installation serveur (garde-fous du dépôt serveur :
-  backup, redémarrage demandé) + ajout au pack packwiz (mod client = impact joueurs)
-- [ ] cerveau au démarrage (launchd) + sauvegarde `brain.sqlite3`
+- [ ] cerveau au démarrage (launchd ; en attendant tmux `ia`, perdu au reboot) + sauvegarde `brain.sqlite3`
+- [ ] `save_note` sans dédoublonnage : 2 notes crabe identiques dans kb (2026-09-13)
 
 ## Fiches : leçons
 - Agents (Sonnet) extrapolent : noms FR inventés quand le jar n'a pas de `fr_fr`, mécaniques déduites de noms de
