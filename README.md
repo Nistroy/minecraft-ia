@@ -15,8 +15,9 @@ touche I / /ia ──► mod (client ou serveur) ──► mod serveur ──HTT
 ```
 
 - **Mod** (`mod/`) : un seul jar Fabric, à installer sur le serveur et, facultatif, chez les joueurs. Côté client :
-  un écran (question, conversation, historique perso, votes ✔/✘). Sans le mod client, `/ia` répond dans le chat,
-  en privé, avec des boutons cliquables.
+  un écran (question, conversation, historique perso, votes ✔/✘) qui montre les icônes des items dans les réponses
+  et la grille de craft des recettes citées. Sans le mod client, `/ia` répond dans le chat, en privé, avec des
+  boutons cliquables.
 - **Cerveau** (`brain/`) : service Python local qui cherche dans les connaissances, appelle le LLM, vérifie les
   sources, garde l'historique et les votes. Il n'écoute que sur `127.0.0.1`.
 - **Connaissances** : un dépôt git séparé par modpack (exemple : [minecraft-ia-kb](https://github.com/Nistroy/minecraft-ia-kb)).
