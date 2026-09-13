@@ -19,3 +19,4 @@ mod/out/
 *.db
 data/
 .env*
+mod/logs/

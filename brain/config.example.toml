@@ -1,0 +1,31 @@
+# Copier vers ~/.config/minecraft-ia/config.toml. Chemins relatifs = relatifs à ce fichier ; ~ accepté.
+
+# Obligatoires
+kb_path = "~/minecraft-ia-kb"                          # dépôt git des connaissances du modpack
+db_path = "~/.local/share/minecraft-ia/brain.sqlite3"  # historique joueurs : à sauvegarder, jamais commité
+
+# Données exactes (minecraft-ia extract)
+mods_dir = "~/minecraft-server/server/mods"
+vanilla_jar = "~/minecraft-server/server/versions/1.21.1/server-1.21.1.jar"
+minecraft_version = "1.21.1"
+
+# Secrets : fichiers hors dépôt, jamais affichés
+# gemini_key_file = "~/.config/minecraft-ia/gemini-key"
+# token_file = "~/.config/minecraft-ia/brain-token"         # créé au premier `serve`, lu par le mod serveur
+# github_token_file = "~/.config/minecraft-ia/github-token" # optionnel : 5000 requêtes/h au lieu de 60
+
+# LLM
+model = "gemini-3.8-flash"
+thinking_level = "high"   # low / medium / high
+
+# API locale (toujours 127.0.0.1)
+port = 8765
+
+# Quotas : caler sur « requests per day » affiché dans AI Studio. 1 question ≈ 2 à 8 appels LLM.
+questions_per_player_per_day = 20
+llm_calls_per_day = 200
+max_tool_rounds = 8
+max_question_chars = 256
+
+# Pousser les notes apprises vers le dépôt distant après chaque commit
+kb_push = false

@@ -1,0 +1,17 @@
+{
+  "key.categories.minecraft_ia": "AI Assistant",
+  "key.minecraft_ia.open": "Open AI assistant",
+  "screen.minecraft_ia.title": "AI Assistant",
+  "screen.minecraft_ia.question": "Question",
+  "screen.minecraft_ia.hint": "Ask about the server's mods…",
+  "screen.minecraft_ia.unavailable": "This server has no AI assistant",
+  "screen.minecraft_ia.ask": "Ask",
+  "screen.minecraft_ia.history": "History",
+  "screen.minecraft_ia.history_empty": "History is empty.",
+  "screen.minecraft_ia.empty": "Ask about the server's mods. Sourced answers, otherwise \"I don't know\".",
+  "screen.minecraft_ia.searching": "Searching…",
+  "screen.minecraft_ia.retry": "(new search)",
+  "screen.minecraft_ia.sources": "Sources: ",
+  "screen.minecraft_ia.vote_up": "Correct answer",
+  "screen.minecraft_ia.vote_down": "Wrong answer: search again"
+}
