@@ -108,6 +108,13 @@ def test_exact_data_tools(toolbox):
     assert "data:recipe:minecraft:crafting_table" in ctx.seen
 
 
+def test_tool_results_register_item_ids(toolbox):
+    _, ctx = run(toolbox[0], "item_recipes", item_id="minecraft:crafting_table", direction="produce")
+    assert {"minecraft:crafting_table", "#minecraft:planks"} <= ctx.item_ids
+    _, ctx = run(toolbox[0], "find_item", name="etabli")
+    assert "minecraft:crafting_table" in ctx.item_ids
+
+
 def test_modrinth_truncates_and_uses_installed_version(toolbox):
     box, http = toolbox
     result, ctx = run(box, "modrinth_project", slug="aether")

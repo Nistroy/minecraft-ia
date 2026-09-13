@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from .db import Database, HistoryEntry
 from .kb import KnowledgeBase, NoteStatus
 from .llm import LLM, LLMError, LLMQuotaError, Message, Step, ToolCall
+from .markers import keep_markers, marker_ids
 from .tools import Toolbox, ToolContext
 
 log = logging.getLogger(__name__)
@@ -42,6 +43,9 @@ version des fiches) ; sinon dis-le.
 - Fait utile trouvé sur le web et absent des fiches : save_note (fait court + URL source exacte) avant answer.
 - Recettes : ingrédients principaux seulement ; le joueur a EMI en jeu pour le détail. Noms d'items en français \
 si connus.
+- Icônes (optionnel) : juste après un nom d'item, tu peux ajouter son id exact entre doubles crochets, ex. \
+« 4 planches [[#minecraft:planks]] », « un établi [[minecraft:crafting_table]] ». Seulement un id ou #tag présent \
+tel quel dans un résultat d'outil ; le nom reste écrit ; 6 max. Jamais d'appel d'outil juste pour une icône.
 """
 
 NUDGE = "Réponds maintenant avec l'outil answer (texte + sources exactes), ou unknown=true."
@@ -227,7 +231,7 @@ class Assistant:
             return llm.step(SYSTEM_PROMPT, messages, self._toolbox.specs())
 
     def _finalize(self, args: dict, ctx: ToolContext, calls: int) -> _Outcome:
-        text = str(args.get("text") or "").strip()[: self._limits.max_answer_chars]
+        text = self._with_icons(str(args.get("text") or "").strip()[: self._limits.max_answer_chars], ctx)
         claimed = args.get("sources") if isinstance(args.get("sources"), list) else []
         # Anti-invention : seule une source réellement renvoyée par un outil est citable.
         sources = list(dict.fromkeys(s for s in claimed if isinstance(s, str) and s in ctx.seen))
@@ -236,6 +240,11 @@ class Assistant:
         if not sources or not text:
             return _Outcome("Je sais pas : aucune source vérifiable trouvée.", [], "unknown", calls, ctx)
         return _Outcome(text, sources, "ok", calls, ctx)
+
+    def _with_icons(self, text: str, ctx: ToolContext) -> str:
+        # Anti-invention : icône seulement pour un id renvoyé par un outil ET présent dans les jars extraits.
+        seen = [i for i in marker_ids(text) if i in ctx.item_ids]
+        return keep_markers(text, self._db.renderable(seen))
 
     def _record(self, question_id: int, outcome: _Outcome, now: datetime, retry_of: int | None) -> Reply:
         self._db.add_llm_calls(quota_day(now), outcome.llm_calls)
