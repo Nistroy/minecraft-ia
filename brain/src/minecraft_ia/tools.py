@@ -16,6 +16,7 @@ import httpx
 from .db import Database
 from .kb import KnowledgeBase
 from .llm import ToolCall, ToolSpec
+from .markers import resource_ids
 
 _SLUG = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _REPO = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
@@ -61,9 +62,11 @@ class PendingNote:
 
 @dataclass
 class ToolContext:
-    """État d'une recherche : sources vues (seules citables) et notes à écrire après la réponse."""
+    """État d'une recherche : sources vues (seules citables), ids d'items vus (seules icônes permises) et notes à
+    écrire après la réponse."""
 
     seen: set[str] = field(default_factory=set)
+    item_ids: set[str] = field(default_factory=set)
     pending_notes: list[PendingNote] = field(default_factory=list)
 
 
@@ -166,11 +169,13 @@ class Toolbox:
         if handler is None:
             return {"error": f"outil inconnu : {call.name}"}
         try:
-            return handler(call.args, ctx)
+            result = handler(call.args, ctx)
         except BadArgs as e:
             return {"error": str(e)}
         except (httpx.HTTPError, KeyError, ValueError) as e:
             return {"error": f"échec : {type(e).__name__}"}
+        ctx.item_ids |= resource_ids(json.dumps(result, ensure_ascii=False, default=str))
+        return result
 
     # --- connaissances locales --------------------------------------------------------------------
 

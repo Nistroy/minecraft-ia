@@ -89,6 +89,29 @@ def test_exact_data_search_and_recipes(db):
     assert db.find_items("etabli", limit=5) == []
 
 
+def test_renderable_keeps_items_blocks_and_recipe_tags(db):
+    db.replace_exact_data(
+        [
+            Item("minecraft:crafting_table", "minecraft", "block", "Crafting Table", "Établi"),
+            Item("minecraft:stick", "minecraft", "item", "Stick", "Bâton"),
+            Item("aether:moa", "aether", "entity", "Moa", None),
+        ],
+        [
+            Recipe(
+                "minecraft:crafting_table",
+                "minecraft",
+                "minecraft:crafting_shaped",
+                "minecraft:crafting_table",
+                ["#minecraft:planks"],
+                "{}",
+            )
+        ],
+    )
+    ids = ["minecraft:crafting_table", "minecraft:stick", "aether:moa", "#minecraft:planks", "#minecraft:logs", "x:y"]
+    assert db.renderable(ids) == {"minecraft:crafting_table", "minecraft:stick", "#minecraft:planks"}
+    assert db.renderable([]) == set()
+
+
 def test_kb_index_search_tolerates_fts_syntax(db):
     db.replace_kb_index(
         [

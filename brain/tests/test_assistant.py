@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 import pytest
 
 from minecraft_ia.assistant import Assistant, Limits, quota_day
+from minecraft_ia.db import Item, Recipe
 from minecraft_ia.kb import KnowledgeBase, NoteStatus
 from minecraft_ia.llm import LLMError, LLMQuotaError, Step, ToolCall
 from minecraft_ia.tools import Toolbox
@@ -102,6 +103,41 @@ def test_model_unknown_keeps_explanation(db, kb_root):
     llm = ScriptedLLM(call("answer", text="Rien dans les fiches.", sources=[], unknown=True))
     reply = make(db, kb_root, llm)[0].ask(PLAYER, "Steve", "Quel est le seed ?")
     assert reply.status == "unknown" and "Rien dans les fiches." in reply.text
+
+
+def test_item_markers_kept_only_if_seen_by_a_tool_and_extracted(db, kb_root):
+    db.replace_exact_data(
+        [
+            Item("minecraft:crafting_table", "minecraft", "block", "Crafting Table", "Établi"),
+            Item("minecraft:diamond", "minecraft", "item", "Diamond", "Diamant"),
+        ],
+        [
+            Recipe(
+                "minecraft:crafting_table",
+                "minecraft",
+                "minecraft:crafting_shaped",
+                "minecraft:crafting_table",
+                ["#minecraft:planks"],
+                "{}",
+            )
+        ],
+    )
+    llm = ScriptedLLM(
+        call("item_recipes", item_id="minecraft:crafting_table"),
+        call(
+            "answer",
+            text="4 planches [[#minecraft:planks]] en carré : établi [[minecraft:crafting_table]]. "
+            "Pas de diamant [[minecraft:diamond]].",
+            sources=["data:recipe:minecraft:crafting_table"],
+        ),
+    )
+    reply = make(db, kb_root, llm)[0].ask(PLAYER, "Steve", "Comment faire un établi ?")
+    assert reply.status == "ok"
+    # diamant : existe dans les jars mais aucun outil ne l'a renvoyé → icône retirée, mot gardé
+    assert (
+        reply.text == "4 planches [[#minecraft:planks]] en carré : établi [[minecraft:crafting_table]]. Pas de diamant."
+    )
+    assert db.history(PLAYER, 1)[0].text == reply.text
 
 
 def test_plain_text_is_nudged_then_round_limit(db, kb_root):

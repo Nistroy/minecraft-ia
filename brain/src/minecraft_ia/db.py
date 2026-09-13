@@ -257,6 +257,19 @@ class Database:
             ).fetchone()
         return _item(row) if row else None
 
+    def renderable(self, ids: Iterable[str]) -> set[str]:
+        """Ids dessinables en icône : item ou bloc extrait, ou tag utilisé par une recette extraite."""
+        wanted = set(ids)
+        items = json.dumps(sorted(i for i in wanted if not i.startswith("#")))
+        tags = json.dumps(sorted(i for i in wanted if i.startswith("#")))
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id FROM item WHERE kind IN ('item', 'block') AND id IN (SELECT value FROM json_each(?))"
+                " UNION SELECT input FROM recipe_input WHERE input IN (SELECT value FROM json_each(?))",
+                (items, tags),
+            ).fetchall()
+        return {r[0] for r in rows}
+
     def find_items(self, query: str, limit: int) -> list[Item]:
         match = fts_query(query)
         if not match:

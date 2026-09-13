@@ -2,6 +2,7 @@ package io.github.nistroy.minecraftia;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class SourceLabelTest {
@@ -26,5 +27,12 @@ class SourceLabelTest {
                 SourceLabel.of("https://modrinth.com/mod/aether"));
         assertEquals(new SourceLabel("http://example.com", null), SourceLabel.of("http://example.com"));
         assertEquals(new SourceLabel("autre", null), SourceLabel.of("autre"));
+    }
+
+    @Test
+    void recipeIdOnlyForRecipeSources() {
+        assertEquals(Optional.of("minecraft:crafting_table"), SourceLabel.recipeId("data:recipe:minecraft:crafting_table"));
+        assertEquals(Optional.empty(), SourceLabel.recipeId("data:item:minecraft:crafting_table"));
+        assertEquals(Optional.empty(), SourceLabel.recipeId("kb:mods/aether.md"));
     }
 }

@@ -11,7 +11,8 @@ modpack Fabric 1.21.1 ; connaissances d'un modpack = dépôt séparé.
 ## Décisions
 | Sujet | Choix | Pourquoi |
 |---|---|---|
-| Interface | écran client (touche `I` par défaut, réassignable) : question, conversation, historique perso, votes ✔/✘ | privé + historique. 1.21.1 : pas de dialogs serveur (1.21.6+, minecraft.wiki `Dialog`) |
+| Interface | écran client (touche `I` par défaut, réassignable) : onglets conversation/historique, bulles, défilement, votes ✔/✘ ; icônes d'items dans le texte ; grille 3x3 des recettes de table de craft citées | privé + historique. 1.21.1 : pas de dialogs serveur (1.21.6+, minecraft.wiki `Dialog`) |
+| Icônes | optionnelles : `[[ns:id]]`/`[[#ns:tag]]` après le nom dans `answer.text` ; client `renderItem` (modèles du jeu), tag = défilement 1 s ; grille = source `data:recipe:` lue dans `RecipeManager` client (1.21.1 : `ClientboundUpdateRecipesPacket`), façonnée/sans forme seulement ; chat : marqueurs retirés | visuel sans appel LLM en plus ; pas de changement de payload |
 | Secours | `/ia <question>`, `/ia historique`, `/ia vote <id> oui\|non` (boutons chat cliquables), réponse privée | joueur sans mod client |
 | 1 jar | mod `minecraft_ia` unique, `environment: *`, sources client séparées (Loom `splitEnvironmentSourceSets`) | 1 release, 1 version ; serveur seul OK, client seul OK (écran dit "serveur sans assistant") |
 | Transport | `CustomPacketPayload` + `PayloadTypeRegistry` + `ServerPlayNetworking`/`ClientPlayNetworking`, tailles bornées au décodage (`readUtf(max)`) | joueur authentifié par MC ; rien exposé sur internet/tunnel |
@@ -46,6 +47,8 @@ historique) → réponse → payload écran ou message chat privé.
 
 ## Règles de réponse (où c'est appliqué)
 - Source obligatoire, sinon "je sais pas" → `Assistant._finalize`.
+- Icône gardée si id renvoyé par un outil (`ToolContext.item_ids`) ET item/bloc extrait ou tag d'une recette extraite
+  (`Database.renderable`), 6 max ; sinon marqueur retiré, mot gardé → `Assistant._with_icons`, `markers.py`.
 - Priorité : données exactes > `validé-nistroy` > fiches > `confirmé-joueur` > web > `non-vérifié` → prompt.
 - Vote ✘ → notes citées `contesté` + 1 seule relance (ne coûte pas de question) ; vote ✔ → `confirmé-joueur` ;
   votes ne touchent jamais `validé-nistroy` ; seul l'auteur vote → `Assistant.vote`, `KnowledgeBase.set_note_status`.
@@ -62,6 +65,8 @@ historique) → réponse → payload écran ou message chat privé.
 - [x] release `v0.1.0` + serveur (backup `pre-minecraft-ia_2026-09-13_22h10`, log : mod chargé, 0 nouvelle erreur) +
   pack packwiz (`minecraft-server` PR #13) — 2026-09-13
 - [ ] test en jeu (`/ia` joueur seulement, pas testable en console) : touche `I`, écran, `/ia` chat, votes, quotas
+- [x] v0.2.0 : écran refait + icônes + grilles de craft, pytest + JUnit verts (rendu non testé automatiquement) — 2026-09-13
+- [ ] v0.2.0 déployée : pack (`minecraft-server`), jar serveur + relance cerveau ; vérifier rendu en jeu
 - [ ] jeu de questions test : `minecraft-ia-kb/eval/questions.toml` (6 amorces) + vraies questions des potes ; `eval` = 0 invention
 - [x] cerveau lancé par `./mc start` du dépôt serveur (tmux `ia`, avant le serveur ; `stop` le laisse) — 2026-09-13
 - [ ] sauvegarde `brain.sqlite3`
