@@ -1,5 +1,7 @@
 package io.github.nistroy.minecraftia;
 
+import java.util.Optional;
+
 /** Libellé lisible d'une source renvoyée par le cerveau ; url seulement pour les liens https cliquables. */
 public record SourceLabel(String label, String url) {
     private static final String FICHE = "kb:mods/";
@@ -27,5 +29,10 @@ public record SourceLabel(String label, String url) {
             return new SourceLabel(source.substring(HTTPS.length()), source);
         }
         return new SourceLabel(source, null);
+    }
+
+    /** Id de recette si la source est une recette exacte (grille de craft de l'écran). */
+    public static Optional<String> recipeId(String source) {
+        return source.startsWith(RECIPE) ? Optional.of(source.substring(RECIPE.length())) : Optional.empty();
     }
 }

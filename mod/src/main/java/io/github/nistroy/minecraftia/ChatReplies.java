@@ -20,7 +20,7 @@ final class ChatReplies {
     }
 
     static void answer(ServerPlayer player, BrainReply reply) {
-        MutableComponent message = prefix().append(Component.literal(reply.text()).withStyle(color(reply.status())));
+        MutableComponent message = prefix().append(Component.literal(ItemMarkers.strip(reply.text())).withStyle(color(reply.status())));
         if (!reply.sources().isEmpty()) {
             message.append(Component.literal("\nSources : ").withStyle(ChatFormatting.GRAY));
             List<String> sources = reply.sources();
@@ -50,7 +50,7 @@ final class ChatReplies {
         for (HistoryItem item : items.subList(0, Math.min(HISTORY_LINES, items.size()))) {
             String vote = item.vote() == null ? "" : item.vote() ? " ✔" : " ✘";
             message.append(Component.literal("\n• " + Texts.truncate(item.question(), 60)).withStyle(ChatFormatting.YELLOW))
-                    .append(Component.literal(" → " + Texts.truncate(item.text(), 100) + vote).withStyle(ChatFormatting.GRAY));
+                    .append(Component.literal(" → " + Texts.truncate(ItemMarkers.strip(item.text()), 100) + vote).withStyle(ChatFormatting.GRAY));
         }
         player.sendSystemMessage(message);
     }

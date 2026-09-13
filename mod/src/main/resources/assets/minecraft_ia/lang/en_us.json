@@ -6,6 +6,7 @@
   "screen.minecraft_ia.hint": "Ask about the server's mods…",
   "screen.minecraft_ia.unavailable": "This server has no AI assistant",
   "screen.minecraft_ia.ask": "Ask",
+  "screen.minecraft_ia.conversation": "Conversation",
   "screen.minecraft_ia.history": "History",
   "screen.minecraft_ia.history_empty": "History is empty.",
   "screen.minecraft_ia.empty": "Ask about the server's mods. Sourced answers, otherwise \"I don't know\".",
