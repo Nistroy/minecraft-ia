@@ -63,7 +63,8 @@ historique) → réponse → payload écran ou message chat privé.
   pack packwiz (`minecraft-server` PR #13) — 2026-09-13
 - [ ] test en jeu (`/ia` joueur seulement, pas testable en console) : touche `I`, écran, `/ia` chat, votes, quotas
 - [ ] jeu de questions test : `minecraft-ia-kb/eval/questions.toml` (6 amorces) + vraies questions des potes ; `eval` = 0 invention
-- [ ] cerveau au démarrage (launchd ; en attendant tmux `ia`, perdu au reboot) + sauvegarde `brain.sqlite3`
+- [x] cerveau lancé par `./mc start` du dépôt serveur (tmux `ia`, avant le serveur ; `stop` le laisse) — 2026-09-13
+- [ ] sauvegarde `brain.sqlite3`
 - [ ] `save_note` sans dédoublonnage : 2 notes crabe identiques dans kb (2026-09-13)
 
 ## Fiches : leçons
