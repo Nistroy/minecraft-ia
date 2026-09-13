@@ -20,6 +20,7 @@ modpack Fabric 1.21.1 ; connaissances d'un modpack = dépôt séparé.
 | Secours | `fallback_models` (défaut `gemini-3.7-flash`, `gemini-3.5-flash`) : question relancée en conversation neuve sur 503/429 ; `gemini-2.5-flash` fermé aux nouveaux comptes | 2026-09-13 : `gemini-3.8-flash` saturé (503) + 429 après 8 appels ; quotas gratuits comptés par modèle |
 | LLM isolé | `brain/src/minecraft_ia/llm.py` seul | changer fournisseur = 1 module |
 | Boucle outils | la nôtre (`automatic_function_calling` désactivé) ; réponse finale = outil `answer(text, sources)` | contrôle des sources |
+| Pré-recherche | avant chaque modèle : `search_knowledge` + 2 meilleures fiches jointes à la question (sources enregistrées) ; 429 par minute ≤ 15 s → attente puis même modèle | tier gratuit constaté 2026-09-13 : 20 requêtes/jour/modèle, 5/min → viser 1-2 appels/question |
 | Anti-invention | source citée acceptée seulement si renvoyée par un outil pendant la recherche ; sinon "je sais pas" | garde-fou en code, pas en prompt |
 | Internet | outils maison : API Modrinth, README + issues GitHub (domaines fixes, pas d'URL libre) | ciblé versions ; pas de SSRF/injection via URL |
 | Connaissances | dépôt git séparé (`Nistroy/minecraft-ia-kb`, public, CC BY-SA 4.0) ; IA commit (auteur `minecraft-ia`), nistroy édite/revert | lisible, historique, annulation |

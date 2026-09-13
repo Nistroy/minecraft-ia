@@ -18,7 +18,12 @@ class LLMError(Exception):
 
 
 class LLMQuotaError(LLMError):
-    """Limite du fournisseur atteinte (HTTP 429)."""
+    """Limite du fournisseur atteinte (HTTP 429). retry_after en secondes si le fournisseur l'indique."""
+
+    def __init__(self, message: str, retry_after: float | None = None, per_minute: bool = False) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+        self.per_minute = per_minute
 
 
 @dataclass(frozen=True)
@@ -54,17 +59,26 @@ class LLM(Protocol):
     def step(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> Step: ...
 
 
-def _quota_message(model: str, error: errors.APIError) -> str:
-    """Détail d'un 429 (quota, valeur, délai de réessai) pour caler les quotas du cerveau. Aucun secret dedans."""
+def _quota_error(model: str, error: errors.APIError) -> LLMQuotaError:
+    """429 → quota, valeur, délai de réessai : pour attendre ou basculer, et caler les quotas. Aucun secret dedans."""
     details = error.details.get("error", {}).get("details", []) if isinstance(error.details, dict) else []
-    parts = []
+    parts: list[str] = []
+    retry_after: float | None = None
+    per_minute = False
     for detail in details:
         kind = str(detail.get("@type", "")).rsplit(".", 1)[-1]
         if kind == "QuotaFailure":
-            parts += [f"{v.get('quotaId')}={v.get('quotaValue')}" for v in detail.get("violations", [])]
+            for violation in detail.get("violations", []):
+                parts.append(f"{violation.get('quotaId')}={violation.get('quotaValue')}")
+                per_minute = per_minute or "PerMinute" in str(violation.get("quotaId", ""))
         elif kind == "RetryInfo":
-            parts.append(f"réessai dans {detail.get('retryDelay')}")
-    return f"{model} : quota atteint ({', '.join(parts) or error.message})"
+            delay = str(detail.get("retryDelay", ""))
+            parts.append(f"réessai dans {delay}")
+            try:
+                retry_after = float(delay.removesuffix("s"))
+            except ValueError:
+                retry_after = None
+    return LLMQuotaError(f"{model} : quota atteint ({', '.join(parts) or error.message})", retry_after, per_minute)
 
 
 class GeminiLLM:
@@ -98,7 +112,7 @@ class GeminiLLM:
             )
         except errors.ClientError as e:
             if e.code == 429:
-                raise LLMQuotaError(_quota_message(self._model, e)) from e
+                raise _quota_error(self._model, e) from e
             raise LLMError(f"{self._model} : {e}") from e
         except (errors.APIError, httpx.HTTPError) as e:
             raise LLMError(f"{self._model} : {e}") from e

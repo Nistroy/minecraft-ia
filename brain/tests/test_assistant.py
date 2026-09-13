@@ -30,7 +30,7 @@ def call(name, **args):
     return Step(text=None, calls=[ToolCall(name, args)], raw=None)
 
 
-def make(db, kb_root, llm, **limits):
+def make(db, kb_root, llm, pause=None, **limits):
     kb = KnowledgeBase(kb_root)
     db.replace_kb_index(kb.documents())
     http = FakeHttp(
@@ -47,7 +47,10 @@ def make(db, kb_root, llm, **limits):
         }
     )
     llms = llm if isinstance(llm, list) else [llm]
-    return Assistant(db, kb, llms, Toolbox(db, kb, http), Limits(**limits), clock=lambda: NOON_UTC), kb
+    assistant = Assistant(
+        db, kb, llms, Toolbox(db, kb, http), Limits(**limits), clock=lambda: NOON_UTC, pause=pause or (lambda _s: None)
+    )
+    return assistant, kb
 
 
 def test_quota_day_uses_pacific_midnight():
@@ -183,3 +186,34 @@ def test_up_vote_confirms_notes(db, kb_root):
     assert assistant.vote(reply.answer_id, PLAYER, up=True) is None
     assert kb.note(note.path).meta["statut"] == NoteStatus.PLAYER_CONFIRMED
     assert db.history(PLAYER, 1)[0].vote is True
+
+
+def test_prefetch_lets_model_answer_in_one_call(db, kb_root):
+    llm = ScriptedLLM(call("answer", text="Cadre de glowstone + seau d'eau.", sources=["kb:mods/aether.md"]))
+    assistant, _ = make(db, kb_root, llm)
+    reply = assistant.ask(PLAYER, "Steve", "Comment aller dans l'Aether ?")
+    assert reply.status == "ok" and reply.sources == ["kb:mods/aether.md"]
+    assert "seau d'eau" in llm.seen_messages[0][0].text  # contenu de la fiche fourni d'avance
+    assert db.llm_calls_on("2026-09-12") == 1
+
+
+def test_per_minute_quota_waits_then_retries_same_model(db, kb_root):
+    waits = []
+    llm = ScriptedLLM(
+        LLMQuotaError("429", retry_after=8.0, per_minute=True),
+        call("answer", text="Glowstone.", sources=["kb:mods/aether.md"]),
+    )
+    backup = ScriptedLLM()
+    assistant, _ = make(db, kb_root, [llm, backup], pause=waits.append)
+    reply = assistant.ask(PLAYER, "Steve", "Comment aller dans l'Aether ?")
+    assert reply.status == "ok" and waits == [8.0] and not backup.seen_messages
+
+
+def test_daily_quota_or_long_wait_falls_back_without_waiting(db, kb_root):
+    waits = []
+    daily = ScriptedLLM(LLMQuotaError("429", retry_after=3.0, per_minute=False))
+    slow = ScriptedLLM(LLMQuotaError("429", retry_after=60.0, per_minute=True))
+    backup = ScriptedLLM(call("answer", text="Glowstone.", sources=["kb:mods/aether.md"]))
+    assistant, _ = make(db, kb_root, [daily, slow, backup], pause=waits.append)
+    reply = assistant.ask(PLAYER, "Steve", "Comment aller dans l'Aether ?")
+    assert reply.status == "ok" and waits == []
