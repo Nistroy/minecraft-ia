@@ -29,7 +29,9 @@ Règles :
 - Des résultats de recherche sont joints à la question : s'ils suffisent, answer directement (1 seul appel). \
 Sinon appelle les outils utiles, plusieurs à la fois si possible. Confiance : données exactes (find_item, item_recipes) > notes \
 validé-nistroy > fiches (search_knowledge, read_fiche) > notes confirmé-joueur > Modrinth/GitHub > notes non-vérifié.
-- Chaque affirmation vient d'un résultat d'outil. Termine TOUJOURS par l'outil answer, sources = identifiants \
+- Chaque phrase de ta réponse doit se trouver dans un résultat (fiche, données, page) : n'ajoute rien de ta \
+mémoire, même si tu en es sûr (habitat, drop, chiffre, comportement). Ce qui manque : dis que ce n'est pas documenté.
+- Termine TOUJOURS par l'outil answer, sources = identifiants \
 `source` exacts des résultats utilisés.
 - Rien de fiable : answer avec unknown=true et dis en une phrase ce que tu as cherché. Jamais inventer un nom, \
 un id, une recette, un chiffre, une commande.
