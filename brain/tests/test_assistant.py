@@ -4,7 +4,7 @@ import pytest
 
 from minecraft_ia.assistant import Assistant, Limits, quota_day
 from minecraft_ia.kb import KnowledgeBase, NoteStatus
-from minecraft_ia.llm import LLMQuotaError, Step, ToolCall
+from minecraft_ia.llm import LLMError, LLMQuotaError, Step, ToolCall
 from minecraft_ia.tools import Toolbox
 
 from .test_tools import FakeHttp
@@ -46,12 +46,32 @@ def make(db, kb_root, llm, **limits):
             }
         }
     )
-    return Assistant(db, kb, llm, Toolbox(db, kb, http), Limits(**limits), clock=lambda: NOON_UTC), kb
+    llms = llm if isinstance(llm, list) else [llm]
+    return Assistant(db, kb, llms, Toolbox(db, kb, http), Limits(**limits), clock=lambda: NOON_UTC), kb
 
 
 def test_quota_day_uses_pacific_midnight():
     assert quota_day(datetime(2026, 9, 12, 6, 59, tzinfo=UTC)) == "2026-09-11"
     assert quota_day(datetime(2026, 9, 12, 7, 0, tzinfo=UTC)) == "2026-09-12"
+
+
+def test_falls_back_to_next_model_with_fresh_conversation(db, kb_root):
+    down = ScriptedLLM(LLMError("503 UNAVAILABLE"))
+    backup = ScriptedLLM(
+        call("search_knowledge", query="aether portail"),
+        call("answer", text="Cadre de glowstone + seau d'eau.", sources=["kb:mods/aether.md"]),
+    )
+    assistant, _ = make(db, kb_root, [down, backup])
+    reply = assistant.ask(PLAYER, "Steve", "Comment aller dans l'Aether ?")
+    assert reply.status == "ok"
+    assert len(backup.seen_messages[0]) == 1  # conversation neuve : rien du modèle en panne n'est rejoué
+    assert db.llm_calls_on("2026-09-12") == 2
+
+
+def test_all_models_failing_reports_error(db, kb_root):
+    llms = [ScriptedLLM(LLMError("503")), ScriptedLLM(LLMQuotaError("429"))]
+    reply = make(db, kb_root, llms)[0].ask(PLAYER, "Steve", "q")
+    assert reply.status == "error" and "Google" in reply.text
 
 
 def test_sourced_answer_is_ok_and_recorded(db, kb_root):

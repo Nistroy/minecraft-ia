@@ -70,3 +70,21 @@ def test_quota_and_other_errors_are_mapped():
     server = errors.ServerError(503, {"error": {"code": 503, "message": "down", "status": "UNAVAILABLE"}})
     with pytest.raises(LLMError):
         GeminiLLM(api_key="k", model="m", thinking_level="low", client=FakeClient(server)).step("s", [], [SPEC])
+
+
+def test_quota_error_message_carries_quota_details():
+    details = [
+        {
+            "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+            "violations": [{"quotaId": "GenerateRequestsPerMinutePerProjectPerModel-FreeTier", "quotaValue": "5"}],
+        },
+        {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "27s"},
+    ]
+    quota = errors.ClientError(
+        429, {"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED", "details": details}}
+    )
+    with pytest.raises(LLMQuotaError) as exc:
+        GeminiLLM(api_key="k", model="m", thinking_level="low", client=FakeClient(quota)).step("s", [], [SPEC])
+    message = str(exc.value)
+    assert "GenerateRequestsPerMinutePerProjectPerModel-FreeTier=5" in message
+    assert "27s" in message and "m" in message

@@ -54,6 +54,19 @@ class LLM(Protocol):
     def step(self, system: str, messages: list[Message], tools: list[ToolSpec]) -> Step: ...
 
 
+def _quota_message(model: str, error: errors.APIError) -> str:
+    """Détail d'un 429 (quota, valeur, délai de réessai) pour caler les quotas du cerveau. Aucun secret dedans."""
+    details = error.details.get("error", {}).get("details", []) if isinstance(error.details, dict) else []
+    parts = []
+    for detail in details:
+        kind = str(detail.get("@type", "")).rsplit(".", 1)[-1]
+        if kind == "QuotaFailure":
+            parts += [f"{v.get('quotaId')}={v.get('quotaValue')}" for v in detail.get("violations", [])]
+        elif kind == "RetryInfo":
+            parts.append(f"réessai dans {detail.get('retryDelay')}")
+    return f"{model} : quota atteint ({', '.join(parts) or error.message})"
+
+
 class GeminiLLM:
     def __init__(
         self, api_key: str, model: str, thinking_level: str, client: Any = None, timeout_ms: int = 90_000
@@ -85,10 +98,10 @@ class GeminiLLM:
             )
         except errors.ClientError as e:
             if e.code == 429:
-                raise LLMQuotaError(str(e)) from e
-            raise LLMError(str(e)) from e
+                raise LLMQuotaError(_quota_message(self._model, e)) from e
+            raise LLMError(f"{self._model} : {e}") from e
         except (errors.APIError, httpx.HTTPError) as e:
-            raise LLMError(str(e)) from e
+            raise LLMError(f"{self._model} : {e}") from e
         calls = [ToolCall(c.name, dict(c.args or {})) for c in (response.function_calls or [])]
         raw = response.candidates[0].content if response.candidates else None
         return Step(text=None if calls else response.text, calls=calls, raw=raw)

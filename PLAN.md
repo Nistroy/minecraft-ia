@@ -17,6 +17,7 @@ modpack Fabric 1.21.1 ; connaissances d'un modpack = dépôt séparé.
 | Transport | `CustomPacketPayload` + `PayloadTypeRegistry` + `ServerPlayNetworking`/`ClientPlayNetworking`, tailles bornées au décodage (`readUtf(max)`) | joueur authentifié par MC ; rien exposé sur internet/tunnel |
 | Cerveau | service Python séparé, `127.0.0.1:8765`, jeton partagé (`~/.config/minecraft-ia/brain-token`, 0600) ; mod serveur = passerelle mince async | corriger/relancer sans redémarrer MC ; testable sans MC |
 | LLM | `gemini-3.8-flash`, `thinking_level` `high`, SDK `google-genai==2.23.0`, tier gratuit (vérifié ai.google.dev 2026-09-12 : stable, gratuit, pas de grounding Search, contenu utilisé par Google — accepté nistroy) | gratuit |
+| Secours | `fallback_models` (défaut `gemini-3.7-flash`, `gemini-3.5-flash`) : question relancée en conversation neuve sur 503/429 ; `gemini-2.5-flash` fermé aux nouveaux comptes | 2026-09-13 : `gemini-3.8-flash` saturé (503) + 429 après 8 appels ; quotas gratuits comptés par modèle |
 | LLM isolé | `brain/src/minecraft_ia/llm.py` seul | changer fournisseur = 1 module |
 | Boucle outils | la nôtre (`automatic_function_calling` désactivé) ; réponse finale = outil `answer(text, sources)` | contrôle des sources |
 | Anti-invention | source citée acceptée seulement si renvoyée par un outil pendant la recherche ; sinon "je sais pas" | garde-fou en code, pas en prompt |

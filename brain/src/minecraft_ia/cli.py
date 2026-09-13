@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import httpx
@@ -23,14 +23,16 @@ from .tools import HttpxClient, Toolbox
 log = logging.getLogger("minecraft_ia")
 
 CONSOLE_PLAYER = "00000000-0000-0000-0000-000000000001"
-LlmFactory = Callable[[Config], LLM]
+LlmFactory = Callable[[Config], Sequence[LLM]]
 
 
-def gemini_from_config(config: Config) -> LLM:
-    return GeminiLLM(read_secret(config.gemini_key_file), config.model, config.thinking_level)
+def gemini_from_config(config: Config) -> list[LLM]:
+    """Modèle principal puis modèles de secours, dans l'ordre de la config."""
+    key = read_secret(config.gemini_key_file)
+    return [GeminiLLM(key, model, config.thinking_level) for model in (config.model, *config.fallback_models)]
 
 
-def build_assistant(config: Config, db: Database, kb: KnowledgeBase, llm: LLM, **limits: int) -> Assistant:
+def build_assistant(config: Config, db: Database, kb: KnowledgeBase, llms: Sequence[LLM], **limits: int) -> Assistant:
     github_token = read_secret(config.github_token_file) if config.github_token_file else None
     defaults = {
         "questions_per_player_per_day": config.questions_per_player_per_day,
@@ -42,7 +44,7 @@ def build_assistant(config: Config, db: Database, kb: KnowledgeBase, llm: LLM, *
     return Assistant(
         db,
         kb,
-        llm,
+        llms,
         Toolbox(db, kb, HttpxClient(github_token)),
         Limits(**{**defaults, **limits}, display_timezone=config.display_timezone),
     )

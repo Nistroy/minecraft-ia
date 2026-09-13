@@ -29,6 +29,8 @@ class Config:
     vanilla_jar: Path | None = None
     minecraft_version: str = "1.21.1"
     model: str = "gemini-3.8-flash"
+    # Essayés dans l'ordre si le principal est saturé (503) ou à court de quota (429) ; quotas gratuits par modèle.
+    fallback_models: tuple[str, ...] = ("gemini-3.7-flash", "gemini-3.5-flash")
     thinking_level: str = "high"
     host: str = "127.0.0.1"
     port: int = 8765
@@ -76,6 +78,10 @@ def load_config(path: Path = DEFAULT_CONFIG) -> Config:
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise ConfigError(f"{key} doit être un entier > 0")
             values[key] = value
+        elif key == "fallback_models":
+            if not isinstance(value, list) or not all(isinstance(m, str) and m.strip() for m in value):
+                raise ConfigError("fallback_models doit être une liste de noms de modèles")
+            values[key] = tuple(m.strip() for m in value)
         else:
             values[key] = value
     config = Config(**values)
