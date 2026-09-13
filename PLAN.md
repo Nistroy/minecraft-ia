@@ -51,14 +51,25 @@ historique) → réponse → payload écran ou message chat privé.
 - Calibrer contre "je sais pas" partout : `minecraft-ia eval <questions.toml>` (0 invention exigé).
 
 ## État 2026-09-13
-- [x] 0 dépôts locaux `~/minecraft-ia`, `~/minecraft-ia-kb` (création GitHub + push : à faire)
-- [x] 2 cerveau + CLI (`serve`, `ask`, `extract`, `kb index`, `eval`), tests pytest
-- [x] 3-4 mod serveur + client, tests JUnit ; jamais lancé en jeu
-- [ ] 1 fiches mods (~65 mods de contenu) : 8 agents parallèles arrêtés par limite de session 2026-09-12 → relancer par vagues de 2
-- [ ] clé Gemini (`~/.config/minecraft-ia/gemini-key`) + RPD réel lu dans AI Studio → quotas
-- [ ] jeu de questions test (vraies questions des potes + pièges "je sais pas")
-- [ ] test en jeu, puis installation serveur (garde-fous du dépôt serveur : backup, redémarrage demandé) + pack packwiz
-- [ ] service cerveau au démarrage (launchd) + sauvegarde `brain.sqlite3`
+- [x] 0 dépôts GitHub publics `Nistroy/minecraft-ia` + `Nistroy/minecraft-ia-kb` ; `IA.md` retiré du dépôt serveur (PR #12)
+- [x] 2 cerveau + CLI (`serve`, `ask`, `extract`, `kb index`, `eval`), pytest + CI verts
+- [x] 3-4 mod serveur + client (1 jar), JUnit + CI verts ; jamais lancé en jeu
+- [x] extraction réelle, 104 jars du serveur : 7 703 noms, 4 290 recettes
+- [x] 1 fiches : 1 par mod de contenu installé, agents + relecture par échantillon (dépôt kb, branche `docs/fiches-mods`)
+- [ ] clé Gemini (`~/.config/minecraft-ia/gemini-key`) + RPD réel lu dans AI Studio → `questions_per_player_per_day`, `llm_calls_per_day`
+- [ ] jeu de questions test : `minecraft-ia-kb/eval/questions.toml` (6 amorces) + vraies questions des potes ; `eval` = 0 invention
+- [ ] release `v0.1.0` (tag → workflow release), test en jeu, puis installation serveur (garde-fous du dépôt serveur :
+  backup, redémarrage demandé) + ajout au pack packwiz (mod client = impact joueurs)
+- [ ] cerveau au démarrage (launchd) + sauvegarde `brain.sqlite3`
+
+## Fiches : leçons
+- Agents (Sonnet) extrapolent : noms FR inventés quand le jar n'a pas de `fr_fr`, mécaniques déduites de noms de
+  fichiers, comparaisons à des défauts non sourcés. Relire par échantillon, vérifier contre jar / config / Modrinth
+  (HTML du body retiré avant recherche).
+- Max 2 agents en parallèle, 1 si la limite approche : 8 agents Opus ont épuisé la limite de session 2026-09-12,
+  2 agents Sonnet l'ont touchée 2026-09-13.
+- `fr_fr` d'un jar parfois périmé (Naturalist) : nom FR seulement si la clé correspond à une entité actuelle.
+- Frontmatter invalide = fiche ignorée par le cerveau (log) ; `python` + `KnowledgeBase` pour valider avant commit.
 
 ## À revérifier avant maj
 - Modèles/tier/thinking Gemini : `ai.google.dev/gemini-api/docs/models`, `/pricing`, `/thinking`, `/rate-limits`.
