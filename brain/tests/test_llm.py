@@ -88,3 +88,20 @@ def test_quota_error_message_carries_quota_details():
     message = str(exc.value)
     assert "GenerateRequestsPerMinutePerProjectPerModel-FreeTier=5" in message
     assert "27s" in message and "m" in message
+    assert exc.value.retry_after == 27.0 and exc.value.per_minute is True
+
+
+def test_daily_quota_is_not_per_minute():
+    details = [
+        {
+            "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+            "violations": [{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier", "quotaValue": "20"}],
+        },
+        {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "3.5s"},
+    ]
+    quota = errors.ClientError(
+        429, {"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED", "details": details}}
+    )
+    with pytest.raises(LLMQuotaError) as exc:
+        GeminiLLM(api_key="k", model="m", thinking_level="low", client=FakeClient(quota)).step("s", [], [SPEC])
+    assert exc.value.per_minute is False and exc.value.retry_after == 3.5
