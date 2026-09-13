@@ -1,0 +1,17 @@
+{
+  "key.categories.minecraft_ia": "Assistant IA",
+  "key.minecraft_ia.open": "Ouvrir l'assistant IA",
+  "screen.minecraft_ia.title": "Assistant IA",
+  "screen.minecraft_ia.question": "Question",
+  "screen.minecraft_ia.hint": "Pose ta question sur les mods…",
+  "screen.minecraft_ia.unavailable": "Ce serveur n'a pas l'assistant IA",
+  "screen.minecraft_ia.ask": "Demander",
+  "screen.minecraft_ia.history": "Historique",
+  "screen.minecraft_ia.history_empty": "Historique vide.",
+  "screen.minecraft_ia.empty": "Pose une question sur les mods du serveur. Réponses sourcées, sinon « je sais pas ».",
+  "screen.minecraft_ia.searching": "Je cherche…",
+  "screen.minecraft_ia.retry": "(nouvelle recherche)",
+  "screen.minecraft_ia.sources": "Sources : ",
+  "screen.minecraft_ia.vote_up": "Réponse juste",
+  "screen.minecraft_ia.vote_down": "Réponse fausse : je cherche encore"
+}

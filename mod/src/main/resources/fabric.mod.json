@@ -1,0 +1,24 @@
+{
+	"schemaVersion": 1,
+	"id": "minecraft_ia",
+	"version": "${version}",
+	"name": "Minecraft IA",
+	"description": "Assistant IA en jeu : questions sur les mods du serveur, réponses sourcées ou « je sais pas ». Demande le cerveau minecraft-ia sur la machine du serveur.",
+	"authors": ["nistroy"],
+	"contact": {
+		"sources": "https://github.com/Nistroy/minecraft-ia",
+		"issues": "https://github.com/Nistroy/minecraft-ia/issues"
+	},
+	"license": "GPL-3.0-only",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["io.github.nistroy.minecraftia.MinecraftIa"],
+		"client": ["io.github.nistroy.minecraftia.client.MinecraftIaClient"]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
