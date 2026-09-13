@@ -17,6 +17,9 @@ minecraft_version = "1.21.1"
 # LLM
 model = "gemini-3.8-flash"
 thinking_level = "high"   # low / medium / high
+# Modèles de secours, essayés dans l'ordre si le principal est saturé (503) ou à court de quota (429).
+# Quotas du tier gratuit comptés par modèle. `gemini-2.5-flash` n'est plus ouvert aux nouveaux comptes (2026-09-13).
+fallback_models = ["gemini-3.7-flash", "gemini-3.5-flash"]
 
 # API locale (toujours 127.0.0.1)
 port = 8765

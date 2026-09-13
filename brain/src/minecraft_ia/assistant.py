@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -83,14 +83,16 @@ class Assistant:
         self,
         db: Database,
         kb: KnowledgeBase,
-        llm: LLM,
+        llms: Sequence[LLM],
         toolbox: Toolbox,
         limits: Limits,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
+        if not llms:
+            raise ValueError("au moins un modèle LLM est requis")
         self._db = db
         self._kb = kb
-        self._llm = llm
+        self._llms = tuple(llms)  # principal puis secours, dans l'ordre
         self._toolbox = toolbox
         self._limits = limits
         self._clock = clock
@@ -162,29 +164,32 @@ class Assistant:
         return f"{reset.hour:02d}h{reset.minute:02d}"
 
     def _run(self, prompt: str) -> _Outcome:
-        ctx = ToolContext()
-        messages = [Message("user", text=prompt)]
         calls = 0
-        try:
-            for _ in range(self._limits.max_tool_rounds):
-                step = self._llm.step(SYSTEM_PROMPT, messages, self._toolbox.specs())
-                calls += 1
-                if not step.calls:
-                    messages += [Message("model", text=step.text, raw=step.raw), Message("user", text=NUDGE)]
-                    continue
-                messages.append(Message("model", calls=step.calls, raw=step.raw))
-                final = next((c for c in step.calls if c.name == "answer"), None)
-                results = [(c.name, self._toolbox.run(c, ctx)) for c in step.calls if c.name != "answer"]
-                if final is not None:
-                    return self._finalize(final.args, ctx, calls)
-                messages.append(Message("tool", results=results))
-        except LLMQuotaError:
-            log.warning("quota Gemini atteint")
-            return _Outcome("Limite Google atteinte, réessaie plus tard.", [], "error", calls, ctx)
-        except LLMError:
-            log.exception("erreur LLM")
-            return _Outcome("Erreur du cerveau IA, réessaie dans un moment.", [], "error", calls, ctx)
-        return _Outcome("Je sais pas : recherche trop longue sans réponse fiable.", [], "unknown", calls, ctx)
+        failure: LLMError | None = None
+        for index, llm in enumerate(self._llms, start=1):
+            # Conversation neuve par modèle : les signatures de pensée d'un modèle ne se rejouent pas sur un autre.
+            ctx = ToolContext()
+            messages = [Message("user", text=prompt)]
+            try:
+                for _ in range(self._limits.max_tool_rounds):
+                    step = llm.step(SYSTEM_PROMPT, messages, self._toolbox.specs())
+                    calls += 1
+                    if not step.calls:
+                        messages += [Message("model", text=step.text, raw=step.raw), Message("user", text=NUDGE)]
+                        continue
+                    messages.append(Message("model", calls=step.calls, raw=step.raw))
+                    final = next((c for c in step.calls if c.name == "answer"), None)
+                    results = [(c.name, self._toolbox.run(c, ctx)) for c in step.calls if c.name != "answer"]
+                    if final is not None:
+                        return self._finalize(final.args, ctx, calls)
+                    messages.append(Message("tool", results=results))
+                return _Outcome("Je sais pas : recherche trop longue sans réponse fiable.", [], "unknown", calls, ctx)
+            except LLMError as e:
+                failure = e
+                log.warning("modèle %d/%d indisponible : %s", index, len(self._llms), e)
+        if isinstance(failure, LLMQuotaError):
+            return _Outcome("Limite Google atteinte, réessaie plus tard.", [], "error", calls, ToolContext())
+        return _Outcome("Erreur du cerveau IA, réessaie dans un moment.", [], "error", calls, ToolContext())
 
     def _finalize(self, args: dict, ctx: ToolContext, calls: int) -> _Outcome:
         text = str(args.get("text") or "").strip()[: self._limits.max_answer_chars]

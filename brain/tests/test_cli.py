@@ -44,7 +44,7 @@ def test_ask_prints_answer_and_sources(tmp_path, kb_root, capsys):
         call("search_knowledge", query="portail"),
         call("answer", text="Glowstone + eau.", sources=["kb:mods/aether.md"]),
     )
-    assert main(["--config", str(cfg), "ask", "portail aether ?"], llm_factory=lambda _cfg: llm) == 0
+    assert main(["--config", str(cfg), "ask", "portail aether ?"], llm_factory=lambda _cfg: [llm]) == 0
     out = capsys.readouterr().out
     assert "Glowstone + eau." in out and "kb:mods/aether.md" in out
 

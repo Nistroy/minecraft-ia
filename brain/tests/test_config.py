@@ -33,6 +33,17 @@ def test_missing_required_key(tmp_path):
         load_config(write(tmp_path / "config.toml", 'kb_path = "kb"\n'))
 
 
+def test_fallback_models(tmp_path):
+    base = 'kb_path = "kb"\ndb_path = "b.sqlite3"\n'
+    assert load_config(write(tmp_path / "a.toml", base)).fallback_models == ("gemini-3.7-flash", "gemini-3.5-flash")
+    cfg = load_config(write(tmp_path / "b.toml", base + 'fallback_models = ["gemini-3.5-flash"]\n'))
+    assert cfg.fallback_models == ("gemini-3.5-flash",)
+    assert load_config(write(tmp_path / "c.toml", base + "fallback_models = []\n")).fallback_models == ()
+    for bad in ['fallback_models = "gemini-3.5-flash"', "fallback_models = [1]"]:
+        with pytest.raises(ConfigError):
+            load_config(write(tmp_path / "d.toml", base + bad + "\n"))
+
+
 def test_read_secret_strips_and_refuses_empty(tmp_path):
     assert read_secret(write(tmp_path / "k", "abc\n")) == "abc"
     with pytest.raises(ConfigError):
