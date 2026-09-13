@@ -18,6 +18,17 @@ def test_rejects_unsafe_slug(kb_root, slug):
     assert KnowledgeBase(kb_root).fiche(slug) is None
 
 
+def test_invalid_frontmatter_is_skipped_not_fatal(kb_root, caplog):
+    (kb_root / "mods" / "broken.md").write_text(
+        "---\nslug: broken\ncote: S (client_side: unsupported)\n---\n# Broken\n", encoding="utf-8"
+    )
+    kb = KnowledgeBase(kb_root)
+    assert kb.fiche("broken") is None
+    assert [f.slug for f in kb.fiches()] == ["aether"]
+    assert [d.slug for d in kb.documents()] == ["aether"]
+    assert "broken.md" in caplog.text
+
+
 def test_add_note_writes_file_and_commits(kb_root):
     kb = KnowledgeBase(kb_root)
     note = kb.add_note(

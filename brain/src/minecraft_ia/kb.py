@@ -46,11 +46,17 @@ class Note:
     body: str
 
 
-def _split_frontmatter(text: str) -> tuple[dict, str]:
+def _read_frontmatter(path: Path) -> tuple[dict, str] | None:
+    """Frontmatter YAML + corps. None si YAML invalide : fichier ignoré, jamais de crash du cerveau."""
+    text = path.read_text(encoding="utf-8")
     if text.startswith("---\n"):
         end = text.find("\n---\n", 4)
         if end != -1:
-            meta = yaml.safe_load(text[4:end]) or {}
+            try:
+                meta = yaml.safe_load(text[4:end]) or {}
+            except yaml.YAMLError:
+                log.warning("frontmatter invalide, fichier ignoré : %s", path)
+                return None
             return (meta if isinstance(meta, dict) else {}), text[end + 5 :]
     return {}, text
 
@@ -98,8 +104,8 @@ class KnowledgeBase:
         path = self.root / "mods" / f"{slug}.md"
         if not path.is_file():
             return None
-        meta, body = _split_frontmatter(path.read_text(encoding="utf-8"))
-        return Fiche(slug, f"mods/{slug}.md", meta, body)
+        parsed = _read_frontmatter(path)
+        return Fiche(slug, f"mods/{slug}.md", *parsed) if parsed else None
 
     def notes(self) -> list[Note]:
         return [
@@ -114,8 +120,8 @@ class KnowledgeBase:
         path = self.root / rel_path
         if not path.is_file():
             return None
-        meta, body = _split_frontmatter(path.read_text(encoding="utf-8"))
-        return Note(rel_path, meta, body)
+        parsed = _read_frontmatter(path)
+        return Note(rel_path, *parsed) if parsed else None
 
     def documents(self) -> Iterator[KbDoc]:
         for f in self.fiches():
