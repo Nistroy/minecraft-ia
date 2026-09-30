@@ -66,7 +66,7 @@ historique) → réponse → payload écran ou message chat privé.
   pack packwiz (`minecraft-server` PR #13) — 2026-09-13
 - [ ] test en jeu (`/ia` joueur seulement, pas testable en console) : touche `I`, écran, `/ia` chat, votes, quotas
 - [x] v0.2.0 : écran refait + icônes + grilles de craft, pytest + JUnit verts (rendu non testé automatiquement) — 2026-09-13
-- [ ] v0.2.0 déployée : pack (`minecraft-server`), jar serveur + relance cerveau ; vérifier rendu en jeu
+- [x] v0.2.0 déployée : pack + jar serveur 2026-09-30 (cerveau déjà à jour, lancé 2026-09-27) ; rendu en jeu à vérifier
 - [ ] jeu de questions test : `minecraft-ia-kb/eval/questions.toml` (6 amorces) + vraies questions des potes ; `eval` = 0 invention
 - [x] cerveau lancé par `./mc start` du dépôt serveur (tmux `ia`, avant le serveur ; `stop` le laisse) — 2026-09-13
 - [ ] sauvegarde `brain.sqlite3`
