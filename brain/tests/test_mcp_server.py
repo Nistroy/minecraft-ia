@@ -125,3 +125,16 @@ def test_tool_argument_called_name_reaches_the_toolbox(server):
     # Régression : `find_item(name=...)` entrait en collision avec le paramètre du relais interne.
     result = session(server, lambda c: c.call_tool("find_item", {"name": "zombie"}))
     assert not result.is_error and json.loads(result.content[0].text) == {"items": []}
+
+
+def test_bearer_header_on_plain_path_reaches_mcp(http, links):
+    token = links.add("bob")
+    response = http.post("/mcp", json=INIT, headers={**HEADERS, "Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("path, auth", [("/mcp", "Bearer faux"), ("/mcp", "Basic x"), ("/autre", "Bearer {token}")])
+def test_bad_bearer_or_path_is_404(http, links, path, auth):
+    token = links.add("bob")
+    response = http.post(path, json=INIT, headers={**HEADERS, "Authorization": auth.format(token=token)})
+    assert response.status_code == 404

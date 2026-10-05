@@ -27,6 +27,21 @@ chemin = 404 (`SecretPathAuth`) ; uvicorn sans journal d'accès (jeton dans le c
 `public_host`. Machine Tailscale renommée `mc-potes` (prénom hors URL publique / journaux CT, nistroy 2026-10-05).
 Positions des joueurs visibles par tout détenteur d'un lien.
 
+Étape 3 (choix nistroy 2026-10-05 : Claude Code + Codex + Antigravity, tous restreints au MCP ; lien automatique ;
+potes sous Windows) :
+- Lien auto : mod → `POST /mcp-link` cerveau (`player`, `name`) → `LinkStore.provision("<pseudo>-jeu")` (nouveau jeton, ancien mort ; nom distinct du lien manuel `<pseudo>`) →
+  `{url: https://<public_host>/mcp, token}` ; jeton envoyé par `Authorization: Bearer` (pas dans les arguments).
+  `revoke` laisse une marque `revoked` : plus de lien auto tant que `mcp-link add` n'a pas rouvert.
+- Live : mod serveur écrit `live_status_file` (JSON `updated`, `tps`, `mspt`, `players[name, dimension, x, y, z]`)
+  toutes les 5 s ; `server_status` l'ajoute si < 30 s.
+- Verrous vérifiés 2026-10-05 : `claude -p --tools "" --strict-mcp-config --mcp-config <fichier>` (CLI 2.1.289) ;
+  `codex exec --ignore-user-config -s read-only -a never --disable shell_tool --disable unified_exec
+  -c web_search=disabled -c tools.view_image=false` (learn.chatgpt.com config-reference / developer-commands, non
+  testé ici) ; `agy -p` refuse en headless toute action à approuver (testé : commande, lecture hors dossier) mais
+  MCP + permission `mcp(minecraft-ia/*)` seulement en config globale (`~/.gemini/config/mcp_config.json`,
+  `~/.gemini/antigravity-cli/settings.json`) ; `.agents/` = projet (règles, skills, plugins, hooks), pas de
+  permissions. `agy` : pas de stdin (`-p` exige le texte en argument), sortie `--output-format json` → `response`.
+
 ## But
 - Joueur pose question sur mods en jeu → réponse rapide, sourcée, sinon "je sais pas". Jamais inventer.
 - IA note ce qu'elle trouve (notes md + statut) → répond plus vite ensuite.

@@ -1,6 +1,8 @@
-"""Liens secrets du MCP : 1 par joueur, révocable sans redémarrer. URL = `https://<hôte>/<jeton>/mcp`.
+"""Liens secrets du MCP : 1 par joueur, révocable sans redémarrer. URL = `https://<hôte>/<jeton>/mcp`, ou
+`https://<hôte>/mcp` + `Authorization: Bearer <jeton>` (CLI lancée par le mod).
 
 Le fichier (0600) ne garde que l'empreinte SHA-256 de chaque jeton : le jeton n'est affiché qu'une fois, à la création.
+Révoquer laisse une marque : le mod ne peut plus réattribuer de lien à ce joueur tant que nistroy ne le recrée pas.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import threading
 from pathlib import Path
 
 _NAME = re.compile(r"^[a-z0-9_-]{1,32}$")
+_REVOKED = "revoked"
 
 
 class LinkError(Exception):
@@ -63,26 +66,33 @@ class LinkStore:
             return None
         digest = _digest(token)
         for name, stored in self._load().items():
-            if hmac.compare_digest(stored, digest):
+            if stored != _REVOKED and hmac.compare_digest(stored, digest):
                 return name
         return None
 
     def names(self) -> list[str]:
-        return sorted(self._load())
+        return sorted(name for name, stored in self._load().items() if stored != _REVOKED)
 
     def add(self, name: str) -> str:
-        if not _NAME.match(name):
-            raise LinkError("nom attendu : 1 à 32 caractères a-z 0-9 _ -")
-        links = dict(self._load())
-        if name in links:
+        """Création à la main (nistroy) ; rouvre aussi l'accès d'un joueur révoqué."""
+        if name in self.names():
             raise LinkError(f"lien déjà existant pour {name} (le révoquer d'abord)")
-        token = secrets.token_urlsafe(32)
-        links[name] = _digest(token)
-        self._save(links)
-        return token
+        return self._issue(name)
+
+    def provision(self, name: str) -> str:
+        """Lien demandé par le mod pour un joueur connecté : nouveau jeton, l'ancien ne marche plus."""
+        if self._load().get(name) == _REVOKED:
+            raise LinkError(f"accès MCP coupé pour {name}")
+        return self._issue(name)
 
     def revoke(self, name: str) -> None:
-        links = dict(self._load())
-        if links.pop(name, None) is None:
+        if name not in self.names():
             raise LinkError(f"aucun lien pour {name}")
-        self._save(links)
+        self._save({**self._load(), name: _REVOKED})
+
+    def _issue(self, name: str) -> str:
+        if not _NAME.match(name):
+            raise LinkError("nom attendu : 1 à 32 caractères a-z 0-9 _ -")
+        token = secrets.token_urlsafe(32)
+        self._save({**self._load(), name: _digest(token)})
+        return token

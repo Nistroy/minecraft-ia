@@ -13,6 +13,7 @@ from typing import Any, Protocol
 from .assistant import Reply
 from .config import LOOPBACK
 from .db import HistoryEntry
+from .mcp_links import LinkError, LinkStore
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +29,10 @@ class AssistantApi(Protocol):
 
 
 class BadRequest(Exception):
+    pass
+
+
+class McpUnavailable(Exception):
     pass
 
 
@@ -59,6 +64,8 @@ def _int(body: dict, key: str, default: int | None = None) -> int:
 class _Handler(BaseHTTPRequestHandler):
     assistant: AssistantApi
     token: str
+    links: LinkStore | None
+    public_host: str | None
     server_version = "minecraft-ia"
 
     def do_GET(self) -> None:  # noqa: N802 — nom imposé par http.server
@@ -68,7 +75,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
-        routes = {"/ask": self._ask, "/vote": self._vote, "/history": self._history}
+        routes = {"/ask": self._ask, "/vote": self._vote, "/history": self._history, "/mcp-link": self._mcp_link}
         route = routes.get(self.path)
         if route is None:
             self._send(404, {"error": "not found"})
@@ -90,6 +97,10 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, route(body))
         except (json.JSONDecodeError, UnicodeDecodeError, BadRequest) as e:
             self._send(400, {"error": f"invalid: {e}"})
+        except McpUnavailable:
+            self._send(503, {"error": "mcp indisponible (public_host absent)"})
+        except LinkError:
+            self._send(403, {"error": "revoked"})
         except Exception:
             log.exception("erreur interne sur %s", self.path)
             self._send(500, {"error": "internal"})
@@ -117,6 +128,18 @@ class _Handler(BaseHTTPRequestHandler):
         entries = self.assistant.history(_player(body), _int(body, "limit", 20))
         return {"items": [_history_json(e) for e in entries]}
 
+    def _mcp_link(self, body: dict) -> dict:
+        """Lien MCP du joueur, demandé par le mod pour sa CLI ; le jeton ne transite que vers ce joueur."""
+        _player(body)
+        name = body.get("name")
+        if not isinstance(name, str) or not _NAME.match(name):
+            raise BadRequest("name")
+        if self.links is None or self.public_host is None:
+            raise McpUnavailable
+        # Nom distinct du lien créé à la main (`mcp-link add <pseudo>`) : le régénérer ne casse pas celui-là.
+        token = self.links.provision(f"{name.lower()}-jeu")
+        return {"url": f"https://{self.public_host}/mcp", "token": token}
+
     def _send(self, status: int, payload: Any) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode()
         self.send_response(status)
@@ -130,10 +153,18 @@ class _Handler(BaseHTTPRequestHandler):
         log.debug("%s %s", self.address_string(), format % args)
 
 
-def make_server(assistant: AssistantApi, token: str, host: str, port: int) -> ThreadingHTTPServer:
+def make_server(
+    assistant: AssistantApi,
+    token: str,
+    host: str,
+    port: int,
+    links: LinkStore | None = None,
+    public_host: str | None = None,
+) -> ThreadingHTTPServer:
     if host not in LOOPBACK:
         raise ValueError(f"le cerveau n'écoute qu'en local, pas sur {host!r}")
-    handler = type("Handler", (_Handler,), {"assistant": assistant, "token": token})
+    attrs = {"assistant": assistant, "token": token, "links": links, "public_host": public_host}
+    handler = type("Handler", (_Handler,), attrs)
     server = ThreadingHTTPServer((host, port), handler)
     server.daemon_threads = True
     return server

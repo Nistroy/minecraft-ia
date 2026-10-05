@@ -50,3 +50,21 @@ def test_running_server_sees_changes_without_restart(tmp_path):
     assert server_side.match(token) == "bob"
     LinkStore(path).revoke("bob")
     assert server_side.match(token) is None
+
+
+def test_provision_creates_then_rotates(store):
+    first = store.provision("steve")
+    assert store.match(first) == "steve" and store.names() == ["steve"]
+    second = store.provision("steve")
+    assert store.match(second) == "steve" and store.match(first) is None
+
+
+def test_revoked_player_cannot_self_provision_until_re_added(store):
+    store.provision("steve")
+    store.revoke("steve")
+    assert store.names() == []
+    with pytest.raises(LinkError):
+        store.provision("steve")
+    token = store.add("steve")  # nistroy rouvre l'accès à la main
+    assert store.match(token) == "steve"
+    assert store.match(store.provision("steve")) == "steve"
