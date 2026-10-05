@@ -3,6 +3,7 @@ package io.github.nistroy.minecraftia.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.nistroy.minecraftia.net.AnswerPayload;
 import io.github.nistroy.minecraftia.net.HistoryPayload;
+import io.github.nistroy.minecraftia.net.LinkPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -27,5 +28,6 @@ public final class MinecraftIaClient implements ClientModInitializer {
                 (payload, context) -> ClientState.INSTANCE.onAnswer(payload.toReply()));
         ClientPlayNetworking.registerGlobalReceiver(HistoryPayload.TYPE,
                 (payload, context) -> ClientState.INSTANCE.onHistory(payload.items()));
+        ClientPlayNetworking.registerGlobalReceiver(LinkPayload.TYPE, (payload, context) -> LocalAssistant.INSTANCE.onLink(payload));
     }
 }

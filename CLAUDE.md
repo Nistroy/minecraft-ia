@@ -9,7 +9,8 @@ sauf `README.md` (humains).
   `kb.py` fiches/notes + commits git · `tools.py` outils du LLM · `assistant.py` quotas + boucle + contrôle sources ·
   `server.py` HTTP local · `mcp_server.py` MCP lecture seule (sans LLM) · `status.py` ping de statut MC ·
   `extract.py` jars + configs → données exactes + fichiers du jeu · `evaluation.py` · `cli.py`.
-- `mod/` — Loom split source sets, mappings Mojang : `src/main` commun + serveur (`Gateway`, `/ia`, payloads) ·
+- `mod/` — Loom split source sets, mappings Mojang : `src/main` commun + serveur (`Gateway`, `/ia`, payloads, live) ·
+  `src/main/.../cli` lancement verrouillé des CLI d'IA du joueur (Java pur, testé) ·
   `src/client` touche + écran · `src/test` JUnit (classes sans MC ou `FriendlyByteBuf` seul).
 - Connaissances d'un modpack : dépôt séparé (config `kb_path`), jamais ici.
 

@@ -2,6 +2,7 @@ package io.github.nistroy.minecraftia;
 
 import io.github.nistroy.minecraftia.net.AskPayload;
 import io.github.nistroy.minecraftia.net.HistoryRequestPayload;
+import io.github.nistroy.minecraftia.net.LinkRequestPayload;
 import io.github.nistroy.minecraftia.net.Payloads;
 import io.github.nistroy.minecraftia.net.VotePayload;
 import java.io.IOException;
@@ -28,7 +29,8 @@ public final class MinecraftIa implements ModInitializer {
         if (FabricLoader.getInstance().getEnvironmentType() != EnvType.SERVER) {
             return;
         }
-        Gateway gateway = createGateway();
+        Path file = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID + ".json");
+        Gateway gateway = createGateway(file);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> IaCommand.register(dispatcher, gateway));
         ServerPlayNetworking.registerGlobalReceiver(AskPayload.TYPE,
                 (payload, context) -> gateway.ask(context.player(), payload.question(), Gateway.Channel.SCREEN));
@@ -36,12 +38,13 @@ public final class MinecraftIa implements ModInitializer {
                 (payload, context) -> gateway.vote(context.player(), payload.answerId(), payload.up(), Gateway.Channel.SCREEN));
         ServerPlayNetworking.registerGlobalReceiver(HistoryRequestPayload.TYPE,
                 (payload, context) -> gateway.history(context.player(), payload.limit(), Gateway.Channel.SCREEN));
+        ServerPlayNetworking.registerGlobalReceiver(LinkRequestPayload.TYPE, (payload, context) -> gateway.mcpLink(context.player()));
     }
 
-    private static Gateway createGateway() {
-        Path file = FabricLoader.getInstance().getConfigDir().resolve(MOD_ID + ".json");
+    private static Gateway createGateway(Path file) {
         try {
             ModConfig config = ModConfig.load(file, Path.of(System.getProperty("user.home")));
+            new LiveStatusWriter(config.liveStatusFile()).register();
             // Relu à chaque appel : le cerveau peut régénérer son jeton sans redémarrer Minecraft.
             Supplier<String> token = () -> {
                 try {

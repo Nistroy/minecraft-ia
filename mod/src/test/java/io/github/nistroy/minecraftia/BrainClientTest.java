@@ -96,6 +96,23 @@ class BrainClientTest {
         assertTrue(!requests.containsKey("/history"));
     }
 
+    @Test
+    void mcpLinkParsesUrlTokenAndRevocation() throws Exception {
+        route("/mcp-link", 200, "{\"url\": \"https://mc.example.ts.net/mcp\", \"token\": \"" + "t".repeat(43) + "\"}");
+        McpLinkReply ok = client.mcpLink(PLAYER, "Steve").get(5, TimeUnit.SECONDS);
+        assertEquals("https://mc.example.ts.net/mcp", ok.url());
+        assertEquals("t".repeat(43), ok.token());
+        assertEquals("", ok.error());
+        JsonObject body = JsonParser.parseString(requests.get("/mcp-link")).getAsJsonObject();
+        assertEquals("Steve", body.get("name").getAsString());
+        server.removeContext("/mcp-link");
+        route("/mcp-link", 403, "{\"error\": \"revoked\"}");
+        assertTrue(client.mcpLink(PLAYER, "Steve").get(5, TimeUnit.SECONDS).error().contains("coupé"));
+        server.removeContext("/mcp-link");
+        route("/mcp-link", 503, "{\"error\": \"mcp indisponible\"}");
+        assertTrue(client.mcpLink(PLAYER, "Steve").get(5, TimeUnit.SECONDS).error().contains("MCP"));
+    }
+
     private URI base() {
         return URI.create("http://127.0.0.1:" + server.getAddress().getPort());
     }

@@ -51,4 +51,14 @@ class PayloadCodecTest {
         HistoryPayload.CODEC.encode(buf, new HistoryPayload(items));
         assertEquals(new HistoryPayload(items), HistoryPayload.CODEC.decode(buf));
     }
+
+    @Test
+    void linkRoundTrip() {
+        FriendlyByteBuf buf = buffer();
+        LinkRequestPayload.CODEC.encode(buf, new LinkRequestPayload());
+        assertEquals(new LinkRequestPayload(), LinkRequestPayload.CODEC.decode(buf));
+        LinkPayload link = new LinkPayload("https://mc.example.ts.net/mcp", "t".repeat(43), "");
+        LinkPayload.CODEC.encode(buf, link);
+        assertEquals(link, LinkPayload.CODEC.decode(buf));
+    }
 }

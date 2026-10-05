@@ -24,6 +24,19 @@ touche I / /ia ──► mod (client ou serveur) ──► mod serveur ──HTT
   Une fiche par mod, plus les notes que l'IA apprend en cherchant. Chaque note est un commit : tout est visible
   et annulable.
 
+## Avec ta propre IA (Claude, ChatGPT/Codex, Antigravity)
+
+Si tu as Claude Code, Codex ou Antigravity installé et connecté sur ton PC, l'écran (`I`) peut leur poser la question
+à la place de l'IA du serveur. C'est ton abonnement qui répond, et l'IA ne peut utiliser que les outils du serveur
+(fichiers du jeu, tables de loot, fiches, statut) : ni ton terminal, ni tes fichiers, ni le web.
+
+- Le bouton en haut de l'écran choisit l'IA ; le mod trouve tout seul celles qui sont installées.
+- Ton lien d'accès au serveur est créé automatiquement à la première question et gardé dans
+  `config/minecraft_ia-client.json`. Ne partage pas ce fichier.
+- Antigravity n'a pas d'option de verrouillage à chaque lancement : le bouton « Autoriser » ajoute à sa config le seul
+  serveur MCP `minecraft-ia`. Le mod refuse de le lancer si ta config Antigravity approuve d'office des commandes ou
+  des écritures.
+
 ## Installation côté serveur
 
 Prérequis : Java 21, Python 3.12+, git, une clé API Gemini ([AI Studio](https://aistudio.google.com)).
