@@ -77,3 +77,8 @@ def test_public_host_must_be_a_bare_hostname(tmp_path):
     for bad in ("https://mc.example.ts.net", "mc.example.ts.net/x", "a b"):
         with pytest.raises(ConfigError):
             load_config(write(tmp_path / "b.toml", base + f'public_host = "{bad}"\n'))
+
+
+def test_live_status_file_default(tmp_path):
+    cfg = load_config(write(tmp_path / "a.toml", 'kb_path = "kb"\ndb_path = "b.sqlite3"\n'))
+    assert cfg.live_status_file.name == "live.json"

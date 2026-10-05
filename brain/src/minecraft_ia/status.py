@@ -1,6 +1,7 @@
 """Statut du serveur Minecraft par Server List Ping (protocole 1.7+, minecraft.wiki « Server List Ping »).
 
-Lecture seule, sans console ni RCON : en ligne ?, version, MOTD, joueurs connectés (échantillon vanilla).
+Lecture seule, sans console ni RCON : en ligne ?, version, MOTD, joueurs connectés (échantillon vanilla). TPS et
+positions : instantané JSON écrit toutes les 5 s par le mod serveur (`live_status_file`), ignoré s'il est périmé.
 """
 
 from __future__ import annotations
@@ -9,10 +10,14 @@ import json
 import re
 import socket
 import struct
+import time
 from collections.abc import Callable
+from pathlib import Path
 
 _FORMAT_CODE = re.compile("§.")
 _MAX_PACKET = 1 << 21  # VarInt de longueur de chaîne : 3 octets max
+LIVE_MAX_AGE = 30  # secondes ; le mod écrit toutes les 5 s
+_LIVE_MISSING = "indisponible (TPS et positions envoyés par le mod serveur)"
 
 
 def varint(value: int) -> bytes:
@@ -98,3 +103,17 @@ def server_status(host: str, port: int, timeout: float = 3.0) -> dict:
         "players_max": players.get("max"),
         "players": [p["name"] for p in sample if isinstance(p, dict) and isinstance(p.get("name"), str)],
     }
+
+
+def live_status(ping_status: Callable[[], dict], live_file: Path, now: Callable[[], float] = time.time) -> dict:
+    status = ping_status()
+    if not status.get("online"):
+        return status
+    try:
+        live = json.loads(live_file.read_text(encoding="utf-8"))
+        fresh = now() - float(live["updated"]) <= LIVE_MAX_AGE
+        if fresh and isinstance(live.get("players"), list):
+            return {**status, "tps": live.get("tps"), "mspt": live.get("mspt"), "positions": live["players"]}
+    except (OSError, ValueError, KeyError, TypeError):  # absent, illisible ou incomplet : statut sans live
+        pass
+    return {**status, "live": _LIVE_MISSING}

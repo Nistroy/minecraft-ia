@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from minecraft_ia.status import read_varint, server_status, varint
+from minecraft_ia.status import live_status, read_varint, server_status, varint
 
 
 def test_varint_roundtrip():
@@ -91,3 +91,34 @@ def test_garbage_response_is_offline():
     finally:
         server.shutdown()
         server.server_close()
+
+
+LIVE = {
+    "updated": 1000,
+    "tps": 19.8,
+    "mspt": 12.3,
+    "players": [{"name": "Steve", "dimension": "minecraft:overworld", "x": 1, "y": 64, "z": -3}],
+}
+
+
+def test_live_status_merges_fresh_snapshot(tmp_path):
+    live = tmp_path / "live.json"
+    live.write_text(json.dumps(LIVE), encoding="utf-8")
+    status = live_status(lambda: {"online": True, "players": ["Steve"]}, live, now=lambda: 1010)
+    assert status["tps"] == 19.8 and status["mspt"] == 12.3
+    assert status["positions"] == LIVE["players"]
+
+
+@pytest.mark.parametrize("content", [None, "{pas du json", json.dumps({**LIVE, "updated": 900})])
+def test_live_status_ignores_missing_broken_or_stale_snapshot(tmp_path, content):
+    live = tmp_path / "live.json"
+    if content is not None:
+        live.write_text(content, encoding="utf-8")
+    status = live_status(lambda: {"online": True}, live, now=lambda: 1010)
+    assert status == {"online": True, "live": "indisponible (TPS et positions envoyés par le mod serveur)"}
+
+
+def test_live_status_offline_skips_snapshot(tmp_path):
+    live = tmp_path / "live.json"
+    live.write_text(json.dumps(LIVE), encoding="utf-8")
+    assert live_status(lambda: {"online": False}, live, now=lambda: 1010) == {"online": False}

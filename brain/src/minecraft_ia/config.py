@@ -40,6 +40,7 @@ class Config:
     mcp_port: int = 8766
     public_host: str | None = None  # nom du tunnel HTTPS (ex. machine.tailnet.ts.net), pour les URL des liens
     mcp_links_file: Path = CONFIG_DIR / "mcp-links.json"
+    live_status_file: Path = Path("~/.local/share/minecraft-ia/live.json").expanduser()  # écrit par le mod serveur
     minecraft_port: int = 25565  # ping de statut sur 127.0.0.1
     # Défauts prudents : à caler sur la limite « requests per day » affichée dans AI Studio.
     questions_per_player_per_day: int = 20
@@ -53,6 +54,7 @@ class Config:
 
 _PATHS = {
     "mcp_links_file",
+    "live_status_file",
     "kb_path",
     "db_path",
     "gemini_key_file",

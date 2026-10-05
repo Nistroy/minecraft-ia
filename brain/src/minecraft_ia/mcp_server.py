@@ -2,7 +2,8 @@
 (Claude, ChatGPT, Antigravity…). Aucun LLM ici : c'est l'IA du joueur qui cherche et répond.
 
 Pas de `save_note` ni `answer` : rien n'est écrit depuis l'extérieur. Exposé sur internet par un tunnel HTTPS
-(Tailscale Funnel) : seul `/<jeton>/mcp` d'un lien valide répond, tout le reste = 404. Pas de journal d'accès
+(Tailscale Funnel) : seul `/<jeton>/mcp` d'un lien valide, ou `/mcp` avec `Authorization: Bearer <jeton>`,
+répond ; tout le reste = 404. Pas de journal d'accès
 (le jeton est dans le chemin).
 """
 
@@ -119,7 +120,8 @@ def build_mcp(toolbox: Toolbox) -> MCPServer:
 
 
 class SecretPathAuth:
-    """`/<jeton>/mcp` d'un lien valide → app MCP sur `/mcp` ; tout le reste → 404, sans dire pourquoi."""
+    """`/<jeton>/mcp` ou `/mcp` + Bearer d'un lien valide → app MCP sur `/mcp` ; tout le reste → 404, sans dire
+    pourquoi."""
 
     def __init__(self, app: ASGIApp, links: LinkStore) -> None:
         self._app = app
@@ -132,13 +134,20 @@ class SecretPathAuth:
         if scope["type"] != "http":
             await send({"type": "websocket.close", "code": 1008})
             return
-        parts = scope["path"].split("/")
-        name = self._links.match(parts[1]) if len(parts) == 3 and parts[2] == "mcp" else None
+        name = self._links.match(self._token(scope))
         if name is None:
             await PlainTextResponse("not found", status_code=404)(scope, receive, send)
             return
         log.info("appel MCP : %s", name)
         await self._app({**scope, "path": "/mcp", "raw_path": b"/mcp"}, receive, send)
+
+    @staticmethod
+    def _token(scope: Scope) -> str:
+        if scope["path"] == "/mcp":
+            header = dict(scope["headers"]).get(b"authorization", b"").decode("latin-1")
+            return header.removeprefix("Bearer ") if header.startswith("Bearer ") else ""
+        parts = scope["path"].split("/")
+        return parts[1] if len(parts) == 3 and parts[2] == "mcp" else ""
 
 
 def build_app(server: MCPServer, links: LinkStore, public_host: str | None) -> ASGIApp:

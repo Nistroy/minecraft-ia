@@ -20,7 +20,7 @@ from .llm import LLM, GeminiLLM
 from .mcp_links import LinkError, LinkStore
 from .mcp_server import build_app, build_mcp, serve_mcp
 from .server import make_server
-from .status import server_status
+from .status import live_status, server_status
 from .tools import HttpxClient, Toolbox
 
 log = logging.getLogger("minecraft_ia")
@@ -37,7 +37,11 @@ def gemini_from_config(config: Config) -> list[LLM]:
 
 def build_toolbox(config: Config, db: Database, kb: KnowledgeBase) -> Toolbox:
     github_token = read_secret(config.github_token_file) if config.github_token_file else None
-    return Toolbox(db, kb, HttpxClient(github_token), status=lambda: server_status("127.0.0.1", config.minecraft_port))
+
+    def status() -> dict:
+        return live_status(lambda: server_status("127.0.0.1", config.minecraft_port), config.live_status_file)
+
+    return Toolbox(db, kb, HttpxClient(github_token), status=status)
 
 
 def build_assistant(config: Config, db: Database, kb: KnowledgeBase, llms: Sequence[LLM], **limits: int) -> Assistant:
@@ -102,7 +106,14 @@ def cmd_serve(args: argparse.Namespace, config: Config, db: Database, llm_factor
     token = ensure_token(config.token_file)
     kb = KnowledgeBase(config.kb_path, push=config.kb_push)
     _reindex(db, kb)
-    server = make_server(build_assistant(config, db, kb, llm_factory(config)), token, config.host, config.port)
+    server = make_server(
+        build_assistant(config, db, kb, llm_factory(config)),
+        token,
+        config.host,
+        config.port,
+        links=LinkStore(config.mcp_links_file),
+        public_host=config.public_host,
+    )
     log.info("cerveau prêt sur http://%s:%d", config.host, config.port)
     try:
         server.serve_forever()

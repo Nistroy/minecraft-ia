@@ -6,6 +6,7 @@ import pytest
 
 from minecraft_ia.assistant import Reply
 from minecraft_ia.db import HistoryEntry
+from minecraft_ia.mcp_links import LinkStore
 from minecraft_ia.server import make_server
 
 TOKEN = "t" * 40
@@ -93,3 +94,37 @@ def test_body_too_large_and_bad_json(server):
 def test_refuses_non_loopback_bind():
     with pytest.raises(ValueError):
         make_server(FakeAssistant(), TOKEN, "0.0.0.0", 0)
+
+
+@pytest.fixture
+def link_server(tmp_path):
+    links = LinkStore(tmp_path / "mcp-links.json")
+    srv = make_server(FakeAssistant(), TOKEN, "127.0.0.1", 0, links=links, public_host="mc.example.ts.net")
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    with httpx.Client(base_url=base, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+        yield client, links
+    srv.shutdown()
+    srv.server_close()
+
+
+def test_mcp_link_provisions_lowercased_player_link(link_server):
+    client, links = link_server
+    r = client.post("/mcp-link", json={"player": PLAYER, "name": "Steve"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["url"] == "https://mc.example.ts.net/mcp" and links.match(body["token"]) == "steve"
+
+
+def test_mcp_link_refused_when_revoked_or_invalid(link_server):
+    client, links = link_server
+    client.post("/mcp-link", json={"player": PLAYER, "name": "Steve"})
+    links.revoke("steve")
+    assert client.post("/mcp-link", json={"player": PLAYER, "name": "Steve"}).status_code == 403
+    assert client.post("/mcp-link", json={"player": PLAYER, "name": "Steve; rm"}).status_code == 400
+    assert httpx.post(client.base_url.join("/mcp-link"), json={"player": PLAYER, "name": "Alex"}).status_code == 401
+
+
+def test_mcp_link_unavailable_without_public_host(server):
+    client, _ = server
+    assert client.post("/mcp-link", json={"player": PLAYER, "name": "Steve"}).status_code == 503
