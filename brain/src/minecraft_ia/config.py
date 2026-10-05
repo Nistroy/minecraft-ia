@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import tomllib
 from dataclasses import dataclass, fields
@@ -12,6 +13,7 @@ CONFIG_DIR = Path("~/.config/minecraft-ia").expanduser()
 DEFAULT_CONFIG = CONFIG_DIR / "config.toml"
 LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
 THINKING_LEVELS = frozenset({"low", "medium", "high"})
+_HOSTNAME = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$")
 
 
 class ConfigError(Exception):
@@ -36,6 +38,8 @@ class Config:
     host: str = "127.0.0.1"
     port: int = 8765
     mcp_port: int = 8766
+    public_host: str | None = None  # nom du tunnel HTTPS (ex. machine.tailnet.ts.net), pour les URL des liens
+    mcp_links_file: Path = CONFIG_DIR / "mcp-links.json"
     minecraft_port: int = 25565  # ping de statut sur 127.0.0.1
     # Défauts prudents : à caler sur la limite « requests per day » affichée dans AI Studio.
     questions_per_player_per_day: int = 20
@@ -48,6 +52,7 @@ class Config:
 
 
 _PATHS = {
+    "mcp_links_file",
     "kb_path",
     "db_path",
     "gemini_key_file",
@@ -103,6 +108,10 @@ def load_config(path: Path = DEFAULT_CONFIG) -> Config:
         raise ConfigError(f"host doit être local ({', '.join(sorted(LOOPBACK))}) : jamais exposé au tunnel")
     if config.thinking_level not in THINKING_LEVELS:
         raise ConfigError(f"thinking_level doit être dans {sorted(THINKING_LEVELS)}")
+    if config.public_host is not None and not (
+        isinstance(config.public_host, str) and _HOSTNAME.match(config.public_host)
+    ):
+        raise ConfigError("public_host : nom d'hôte seul attendu (ex. machine.tailnet.ts.net), sans https:// ni chemin")
     if not isinstance(config.kb_push, bool):
         raise ConfigError("kb_push doit être true/false")
     return config

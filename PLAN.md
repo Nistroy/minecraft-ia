@@ -8,7 +8,7 @@ Remplace Gemini : chaque pote interroge le serveur avec sa propre IA (abonnement
 | Étape | Contenu | État |
 |---|---|---|
 | 1 | `minecraft-ia mcp` : MCP lecture seule, fichiers du jeu, statut live (ping) | fait 2026-10-05 |
-| 2 | exposition : Tailscale Funnel (pas de domaine), 1 lien secret/pote, révocable | à faire |
+| 2 | exposition : Tailscale Funnel (pas de domaine), 1 lien secret/pote, révocable | code fait 2026-10-05 |
 | 3 | mod : écran `I` lance la CLI headless du pote (`claude -p`, `codex exec`, Antigravity CLI ?) branchée sur le MCP, outils MCP seuls ; TPS + positions joueurs (code serveur) | à faire |
 | 4 | retrait Gemini + `/ia` ; pote sans abonnement payant = pas d'assistant (choix nistroy) | à faire |
 
@@ -21,8 +21,11 @@ Vérifié 2026-10-05 :
 - Gemini CLI : connexion Google gratuite fermée 2026-06-18 (geminicli.com quota-and-pricing).
 - Abonnement d'un pote ≠ API : jamais branché ailleurs que dans sa propre CLI/appli.
 
-Étape 2 pièges : log d'accès uvicorn écrit le chemin (secret dans l'URL → logs) ; `transport_security` du SDK filtre
-l'en-tête Host (ajouter le nom Funnel) ; positions des joueurs visibles par tout détenteur d'un lien.
+Étape 2 : lien `https://<public_host>/<jeton>/mcp` (`minecraft-ia mcp-link add|list|revoke <nom>`) ; fichier
+`mcp_links_file` (0600) = empreintes SHA-256 seules, relu à chaque changement (révocation sans redémarrage) ; autre
+chemin = 404 (`SecretPathAuth`) ; uvicorn sans journal d'accès (jeton dans le chemin) ; Host accepté = local +
+`public_host`. Machine Tailscale renommée `mc-potes` (prénom hors URL publique / journaux CT, nistroy 2026-10-05).
+Positions des joueurs visibles par tout détenteur d'un lien.
 
 ## But
 - Joueur pose question sur mods en jeu → réponse rapide, sourcée, sinon "je sais pas". Jamais inventer.

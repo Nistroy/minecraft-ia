@@ -24,7 +24,9 @@ fallback_models = ["gemini-3.7-flash", "gemini-3.5-flash"]
 
 # API locale (toujours 127.0.0.1)
 port = 8765
-mcp_port = 8766         # minecraft-ia mcp → http://127.0.0.1:8766/mcp
+mcp_port = 8766         # minecraft-ia mcp → http://127.0.0.1:8766/<jeton>/mcp
+# public_host = "machine.tailnet.ts.net"  # nom du tunnel HTTPS (Tailscale Funnel) : URL des liens + en-tête Host accepté
+# mcp_links_file = "~/.config/minecraft-ia/mcp-links.json"  # empreintes des liens, 0600
 minecraft_port = 25565  # statut du serveur (ping), lu sur 127.0.0.1
 
 # Quotas : caler sur « requests per day » affiché dans AI Studio. 1 question ≈ 2 à 8 appels LLM.
