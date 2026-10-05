@@ -1,20 +1,28 @@
 """Serveur MCP (Streamable HTTP, 127.0.0.1) : les outils de la `Toolbox` en lecture seule, pour l'IA de chaque joueur
 (Claude, ChatGPT, Antigravity…). Aucun LLM ici : c'est l'IA du joueur qui cherche et répond.
 
-Pas de `save_note` ni `answer` : rien n'est écrit depuis l'extérieur.
+Pas de `save_note` ni `answer` : rien n'est écrit depuis l'extérieur. Exposé sur internet par un tunnel HTTPS
+(Tailscale Funnel) : seul `/<jeton>/mcp` d'un lien valide répond, tout le reste = 404. Pas de journal d'accès
+(le jeton est dans le chemin).
 """
 
 from __future__ import annotations
 
 import json
+import logging
 from importlib.metadata import version
 
+import uvicorn
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
+from starlette.responses import PlainTextResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .config import LOOPBACK
 from .llm import ToolCall
+from .mcp_links import LinkStore
 from .tools import MCP_SPECS, SPECS, Toolbox, ToolContext
 
 MCP_TOOLS = (
@@ -30,6 +38,7 @@ MCP_TOOLS = (
     "read_file",
     "server_status",
 )
+log = logging.getLogger(__name__)
 _WEB_TOOLS = frozenset({"modrinth_project", "github_readme", "github_issues"})
 
 INSTRUCTIONS = """\
@@ -109,7 +118,42 @@ def build_mcp(toolbox: Toolbox) -> MCPServer:
     return server
 
 
-def serve_mcp(server: MCPServer, host: str, port: int) -> None:
+class SecretPathAuth:
+    """`/<jeton>/mcp` d'un lien valide → app MCP sur `/mcp` ; tout le reste → 404, sans dire pourquoi."""
+
+    def __init__(self, app: ASGIApp, links: LinkStore) -> None:
+        self._app = app
+        self._links = links
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "lifespan":
+            await self._app(scope, receive, send)
+            return
+        if scope["type"] != "http":
+            await send({"type": "websocket.close", "code": 1008})
+            return
+        parts = scope["path"].split("/")
+        name = self._links.match(parts[1]) if len(parts) == 3 and parts[2] == "mcp" else None
+        if name is None:
+            await PlainTextResponse("not found", status_code=404)(scope, receive, send)
+            return
+        log.info("appel MCP : %s", name)
+        await self._app({**scope, "path": "/mcp", "raw_path": b"/mcp"}, receive, send)
+
+
+def build_app(server: MCPServer, links: LinkStore, public_host: str | None) -> ASGIApp:
+    # Protection DNS rebinding du SDK : en-tête Host local ou nom public du tunnel seulement.
+    hosts = ["127.0.0.1:*", "localhost:*", "[::1]:*"]
+    origins = ["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"]
+    if public_host:
+        hosts.append(public_host)
+        origins.append(f"https://{public_host}")
+    security = TransportSecuritySettings(allowed_hosts=hosts, allowed_origins=origins)
+    app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)
+    return SecretPathAuth(app, links)
+
+
+def serve_mcp(app: ASGIApp, host: str, port: int) -> None:
     if host not in LOOPBACK:
         raise ValueError(f"le MCP n'écoute qu'en local, pas sur {host!r} : l'exposition passe par un tunnel")
-    server.run("streamable-http", host=host, port=port, stateless_http=True, json_response=True)
+    uvicorn.run(app, host=host, port=port, access_log=False)

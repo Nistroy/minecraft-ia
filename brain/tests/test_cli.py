@@ -58,7 +58,7 @@ def test_extract_stores_game_files_and_server_config(tmp_path, kb_root, capsys):
 
 def test_mcp_serves_on_configured_local_port_without_gemini_key(tmp_path, kb_root, monkeypatch):
     served = []
-    monkeypatch.setattr(cli, "serve_mcp", lambda server, host, port: served.append((server.name, host, port)))
+    monkeypatch.setattr(cli, "serve_mcp", lambda app, host, port: served.append((host, port)))
     cfg = config(tmp_path, kb_root)
     with cfg.open("a", encoding="utf-8") as f:
         f.write("mcp_port = 9123\n")
@@ -67,7 +67,19 @@ def test_mcp_serves_on_configured_local_port_without_gemini_key(tmp_path, kb_roo
         raise AssertionError("le MCP n'appelle aucun LLM")
 
     assert main(["--config", str(cfg), "mcp"], llm_factory=no_llm) == 0
-    assert served == [("minecraft-ia", "127.0.0.1", 9123)]
+    assert served == [("127.0.0.1", 9123)]
+
+
+def test_mcp_link_add_list_revoke(tmp_path, kb_root, capsys):
+    cfg = config(tmp_path, kb_root, mcp_links_file="links.json", public_host="mc.example.ts.net")
+    assert main(["--config", str(cfg), "mcp-link", "add", "bob"]) == 0
+    out = capsys.readouterr().out
+    assert "https://mc.example.ts.net/" in out and "/mcp" in out
+    assert main(["--config", str(cfg), "mcp-link", "list"]) == 0
+    assert capsys.readouterr().out.strip() == "bob"
+    assert main(["--config", str(cfg), "mcp-link", "revoke", "bob"]) == 0
+    assert main(["--config", str(cfg), "mcp-link", "revoke", "bob"]) == 2
+    assert "bob" in capsys.readouterr().err
 
 
 def test_ask_prints_answer_and_sources(tmp_path, kb_root, capsys):

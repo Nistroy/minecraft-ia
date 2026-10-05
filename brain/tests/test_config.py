@@ -68,3 +68,12 @@ def test_mcp_and_live_status_settings(tmp_path):
     assert cfg.config_dir == tmp_path / "server/config" and cfg.mcp_port == 9000
     with pytest.raises(ConfigError):
         load_config(write(tmp_path / "c.toml", base + "minecraft_port = 0\n"))
+
+
+def test_public_host_must_be_a_bare_hostname(tmp_path):
+    base = 'kb_path = "kb"\ndb_path = "b.sqlite3"\n'
+    cfg = load_config(write(tmp_path / "a.toml", base + 'public_host = "mc.example.ts.net"\n'))
+    assert cfg.public_host == "mc.example.ts.net" and cfg.mcp_links_file.name == "mcp-links.json"
+    for bad in ("https://mc.example.ts.net", "mc.example.ts.net/x", "a b"):
+        with pytest.raises(ConfigError):
+            load_config(write(tmp_path / "b.toml", base + f'public_host = "{bad}"\n'))

@@ -1,4 +1,4 @@
-"""CLI du cerveau : serve, mcp, ask, extract, kb index, eval."""
+"""CLI du cerveau : serve, mcp, mcp-link, ask, extract, kb index, eval."""
 
 from __future__ import annotations
 
@@ -17,7 +17,8 @@ from .evaluation import load_questions, run_eval
 from .extract import config_files, extract_all, fetch_vanilla_lang
 from .kb import KnowledgeBase
 from .llm import LLM, GeminiLLM
-from .mcp_server import build_mcp, serve_mcp
+from .mcp_links import LinkError, LinkStore
+from .mcp_server import build_app, build_mcp, serve_mcp
 from .server import make_server
 from .status import server_status
 from .tools import HttpxClient, Toolbox
@@ -115,8 +116,30 @@ def cmd_serve(args: argparse.Namespace, config: Config, db: Database, llm_factor
 def cmd_mcp(args: argparse.Namespace, config: Config, db: Database, llm_factory: LlmFactory) -> int:
     kb = KnowledgeBase(config.kb_path, push=config.kb_push)
     _reindex(db, kb)
-    log.info("MCP prêt sur http://%s:%d/mcp", config.host, config.mcp_port)
-    serve_mcp(build_mcp(build_toolbox(config, db, kb)), config.host, config.mcp_port)
+    links = LinkStore(config.mcp_links_file)
+    if not links.names():
+        log.warning("aucun lien : tout appel sera refusé (minecraft-ia mcp-link add <nom>)")
+    app = build_app(build_mcp(build_toolbox(config, db, kb)), links, config.public_host)
+    log.info("MCP prêt sur http://%s:%d/<jeton>/mcp", config.host, config.mcp_port)
+    serve_mcp(app, config.host, config.mcp_port)
+    return 0
+
+
+def cmd_mcp_link(args: argparse.Namespace, config: Config, db: Database, llm_factory: LlmFactory) -> int:
+    links = LinkStore(config.mcp_links_file)
+    try:
+        if args.link_command == "add":
+            token = links.add(args.name)
+            base = f"https://{config.public_host}" if config.public_host else f"http://127.0.0.1:{config.mcp_port}"
+            print(f"Lien MCP de {args.name} (affiché une seule fois, à garder secret) :\n{base}/{token}/mcp")
+        elif args.link_command == "revoke":
+            links.revoke(args.name)
+            print(f"lien de {args.name} révoqué")
+        else:
+            print("\n".join(links.names()))
+    except LinkError as e:
+        print(f"erreur : {e}", file=sys.stderr)
+        return 2
     return 0
 
 
@@ -134,7 +157,14 @@ def cmd_eval(args: argparse.Namespace, config: Config, db: Database, llm_factory
     return 0 if report.invented == 0 else 1
 
 
-COMMANDS = {"serve": cmd_serve, "mcp": cmd_mcp, "ask": cmd_ask, "extract": cmd_extract, "eval": cmd_eval}
+COMMANDS = {
+    "serve": cmd_serve,
+    "mcp": cmd_mcp,
+    "mcp-link": cmd_mcp_link,
+    "ask": cmd_ask,
+    "extract": cmd_extract,
+    "eval": cmd_eval,
+}
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -144,6 +174,12 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("serve", help="API locale pour le mod serveur")
     sub.add_parser("mcp", help="serveur MCP local en lecture seule (outils sans LLM)")
+    link = sub.add_parser("mcp-link", help="liens secrets du MCP, 1 par joueur").add_subparsers(
+        dest="link_command", required=True
+    )
+    link.add_parser("add", help="crée un lien (affiché une seule fois)").add_argument("name")
+    link.add_parser("list", help="noms des liens actifs")
+    link.add_parser("revoke", help="révoque un lien").add_argument("name")
     sub.add_parser("ask", help="pose une question en console").add_argument("question")
     sub.add_parser("extract", help="données exactes depuis les jars").add_argument(
         "--no-vanilla-fr", action="store_true", help="ne pas télécharger les noms FR vanilla"

@@ -47,8 +47,20 @@ cp config.example.toml ~/.config/minecraft-ia/config.toml   # puis adapter les c
 
 `minecraft-ia mcp` expose les mêmes outils, plus la lecture des fichiers du jeu (tables de loot, tags, configs des
 mods) et l'état du serveur (en ligne, version, joueurs connectés), à l'IA de chaque joueur : Claude, ChatGPT,
-Antigravity… Aucun LLM ne tourne sur le serveur ; rien ne peut y être écrit. Il n'écoute que sur `127.0.0.1` :
-l'exposer sur internet passe par un tunnel HTTPS (à venir).
+Antigravity… Aucun LLM ne tourne sur le serveur ; rien ne peut y être écrit. Il n'écoute que sur `127.0.0.1` ;
+on l'expose sur internet avec un tunnel HTTPS, par exemple `tailscale funnel --bg 8766`, puis on règle
+`public_host` dans la config.
+
+Chaque joueur reçoit son propre lien secret, révocable à tout moment, même pendant que le serveur tourne :
+
+```sh
+minecraft-ia mcp-link add alex      # affiche https://<public_host>/<jeton>/mcp, une seule fois
+minecraft-ia mcp-link list
+minecraft-ia mcp-link revoke alex
+```
+
+Le lien se colle tel quel dans Claude (connecteur personnalisé), ChatGPT (mode développeur, sans authentification)
+ou Antigravity (`serverUrl`). Toute autre adresse répond 404.
 
 Tester sans Minecraft : `minecraft-ia ask "comment aller dans l'Aether ?"`. Mesurer la qualité :
 `minecraft-ia eval questions.toml` (questions attendues + pièges qui doivent donner « je sais pas »).
