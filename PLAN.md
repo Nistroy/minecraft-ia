@@ -9,7 +9,7 @@ Remplace Gemini : chaque pote interroge le serveur avec sa propre IA (abonnement
 |---|---|---|
 | 1 | `minecraft-ia mcp` : MCP lecture seule, fichiers du jeu, statut live (ping) | fait 2026-10-05 |
 | 2 | exposition : Tailscale Funnel (pas de domaine), 1 lien secret/pote, révocable | en service 2026-10-05 (Funnel 443 → 8766, test externe OK) |
-| 3 | mod : écran `I` lance la CLI headless du pote (`claude -p`, `codex exec`, `agy -p`) branchée sur le MCP, outils MCP seuls ; TPS + positions joueurs (code serveur) | code fait 2026-10-05 (v0.3.0) |
+| 3 | mod : écran `I` lance la CLI headless du pote (`claude -p`, `codex exec`, `agy -p`) branchée sur le MCP, outils MCP seuls ; TPS + positions joueurs (code serveur) | déployé 2026-10-05 : serveur + pack v0.3.0 ; Codex, Windows, rendu en jeu non testés |
 | 4 | retrait Gemini + `/ia` ; pote sans abonnement payant = pas d'assistant (choix nistroy) | à faire |
 
 Vérifié 2026-10-05 :
@@ -123,6 +123,8 @@ historique) → réponse → payload écran ou message chat privé.
 - [x] cerveau lancé par `./mc start` du dépôt serveur (tmux `ia`, avant le serveur ; `stop` le laisse) — 2026-09-13
 - [ ] sauvegarde `brain.sqlite3`
 - [x] MCP lecture seule local (`minecraft-ia mcp`) : 11 outils, extraction réelle 139 jars / 34 739 fichiers, appels HTTP réels OK — 2026-10-05
+- [x] v0.3.0 (CLI du joueur verrouillée sur le MCP, lien auto, TPS + positions) : serveur (backup `pre-minecraft-ia-0-3-0_2026-10-05_18h24`, démarrage propre) + pack — 2026-10-05
+- [ ] test en jeu v0.3.0 sous Windows (Claude Code / Codex / Antigravity)
 - [ ] `save_note` sans dédoublonnage : 2 notes crabe identiques dans kb (2026-09-13)
 
 ## Fiches : leçons
