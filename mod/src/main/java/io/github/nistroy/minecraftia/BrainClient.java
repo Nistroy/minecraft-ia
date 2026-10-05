@@ -68,7 +68,41 @@ public final class BrainClient {
         return post("/history", body).thenApply(json -> json.map(BrainClient::parseHistory).orElseGet(List::of));
     }
 
+    /** Lien MCP du joueur (nouveau jeton à chaque appel) ; erreur lisible si l'accès est coupé ou le MCP absent. */
+    public CompletableFuture<McpLinkReply> mcpLink(UUID player, String name) {
+        JsonObject body = new JsonObject();
+        body.addProperty("player", player.toString());
+        body.addProperty("name", name);
+        return send("/mcp-link", body).thenApply(response -> response.map(r -> switch (r.statusCode()) {
+            case 200 -> parseJson(r.body(), "/mcp-link")
+                    .map(j -> new McpLinkReply(string(j, "url", ""), string(j, "token", ""), ""))
+                    .orElseGet(() -> McpLinkReply.failed(UNAVAILABLE));
+            case 403 -> McpLinkReply.failed("Ton accès MCP a été coupé : demande à nistroy.");
+            case 503 -> McpLinkReply.failed("Le MCP n'est pas configuré sur le serveur.");
+            default -> McpLinkReply.failed(UNAVAILABLE);
+        }).orElseGet(() -> McpLinkReply.failed(UNAVAILABLE)));
+    }
+
     private CompletableFuture<Optional<JsonObject>> post(String path, JsonObject body) {
+        return send(path, body).thenApply(response -> response.flatMap(r -> {
+            if (r.statusCode() != 200) {
+                LOG.warn("cerveau : HTTP {} sur {}", r.statusCode(), path);
+                return Optional.empty();
+            }
+            return parseJson(r.body(), path);
+        }));
+    }
+
+    private static Optional<JsonObject> parseJson(String body, String path) {
+        try {
+            return Optional.of(JsonParser.parseString(body).getAsJsonObject());
+        } catch (RuntimeException e) {
+            LOG.warn("cerveau : JSON invalide sur {}", path);
+            return Optional.empty();
+        }
+    }
+
+    private CompletableFuture<Optional<HttpResponse<String>>> send(String path, JsonObject body) {
         String authorization;
         try {
             authorization = "Bearer " + token.get();
@@ -87,16 +121,7 @@ public final class BrainClient {
                 LOG.warn("cerveau injoignable sur {} : {}", path, error.toString());
                 return Optional.empty();
             }
-            if (response.statusCode() != 200) {
-                LOG.warn("cerveau : HTTP {} sur {}", response.statusCode(), path);
-                return Optional.empty();
-            }
-            try {
-                return Optional.of(JsonParser.parseString(response.body()).getAsJsonObject());
-            } catch (RuntimeException e) {
-                LOG.warn("cerveau : JSON invalide sur {}", path);
-                return Optional.empty();
-            }
+            return Optional.of(response);
         });
     }
 

@@ -26,6 +26,7 @@ class ModConfigTest {
         assertEquals(home.resolve(".config/minecraft-ia/brain-token"), config.tokenFile());
         assertEquals(256, config.maxQuestionLength());
         assertEquals(Duration.ofSeconds(90), config.timeout());
+        assertEquals(home.resolve(".local/share/minecraft-ia/live.json"), config.liveStatusFile());
         assertTrue(Files.exists(file));
         assertEquals(config, ModConfig.load(file, home));
     }

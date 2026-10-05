@@ -20,8 +20,10 @@ public final class Payloads {
         PayloadTypeRegistry.playC2S().register(AskPayload.TYPE, AskPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(VotePayload.TYPE, VotePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(HistoryRequestPayload.TYPE, HistoryRequestPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(LinkRequestPayload.TYPE, LinkRequestPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(AnswerPayload.TYPE, AnswerPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(HistoryPayload.TYPE, HistoryPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(LinkPayload.TYPE, LinkPayload.CODEC);
     }
 
     static int readCount(FriendlyByteBuf buf, int max) {

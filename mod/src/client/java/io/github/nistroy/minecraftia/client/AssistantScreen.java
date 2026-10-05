@@ -13,7 +13,10 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
-/** Écran de l'assistant : onglets conversation / historique, question, votes ✔/✘ sur la dernière réponse. */
+/**
+ * Écran de l'assistant : onglets conversation / historique, question, votes ✔/✘ (Gemini du serveur seulement), choix de
+ * l'IA (CLI du joueur ou serveur), autorisation d'Antigravity.
+ */
 final class AssistantScreen extends Screen {
     private static final int MAX_WIDTH = 420;
     private static final int MARGIN = 8;
@@ -31,6 +34,9 @@ final class AssistantScreen extends Screen {
     private EditBox input;
     private Button conversationTab;
     private Button historyTab;
+    private Button askButton;
+    private Button agyButton;
+    private Button modeButton;
     private Button upButton;
     private Button downButton;
     private boolean showHistory;
@@ -58,9 +64,16 @@ final class AssistantScreen extends Screen {
         input.setMaxLength(AskPayload.MAX_LENGTH);
         input.setHint(Component.translatable(available ? "screen.minecraft_ia.hint" : "screen.minecraft_ia.unavailable"));
         input.setEditable(available);
-        Button ask = addRenderableWidget(Button.builder(Component.translatable("screen.minecraft_ia.ask"), b -> submit())
+        askButton = addRenderableWidget(Button.builder(Component.translatable("screen.minecraft_ia.ask"), b -> submit())
                 .bounds(inner - 106, footerY, 60, 20).build());
-        ask.active = available;
+        agyButton = addRenderableWidget(Button.builder(Component.translatable("screen.minecraft_ia.agy_authorize"),
+                b -> authorizeAgy()).bounds(inner - 106, footerY, 60, 20)
+                .tooltip(Tooltip.create(Component.translatable("screen.minecraft_ia.agy_tooltip"))).build());
+        modeButton = addRenderableWidget(Button.builder(Component.literal(""), b -> {
+            LocalAssistant.INSTANCE.cycleMode();
+            refresh();
+        }).bounds(inner - 268, top + 4, 110, 20).tooltip(Tooltip.create(Component.translatable("screen.minecraft_ia.mode_tooltip")))
+                .build());
         upButton = addRenderableWidget(Button.builder(Component.literal("✔"), b -> vote(true)).bounds(inner - 42, footerY, 20, 20)
                 .tooltip(Tooltip.create(Component.translatable("screen.minecraft_ia.vote_up"))).build());
         downButton = addRenderableWidget(Button.builder(Component.literal("✘"), b -> vote(false)).bounds(inner - 20, footerY, 20, 20)
@@ -88,9 +101,26 @@ final class AssistantScreen extends Screen {
             return;
         }
         showHistory = false;
-        ClientState.INSTANCE.asked(question);
-        ClientPlayNetworking.send(new AskPayload(question));
+        if (LocalAssistant.INSTANCE.mode().isPresent()) {
+            if (LocalAssistant.INSTANCE.busy()) {
+                return;
+            }
+            ClientState.INSTANCE.asked(question);
+            LocalAssistant.INSTANCE.ask(question);
+        } else {
+            ClientState.INSTANCE.asked(question);
+            ClientPlayNetworking.send(new AskPayload(question));
+        }
         input.setValue("");
+    }
+
+    private void authorizeAgy() {
+        if (!available || LocalAssistant.INSTANCE.busy()) {
+            return;
+        }
+        showHistory = false;
+        ClientState.INSTANCE.asked(null);
+        LocalAssistant.INSTANCE.authorizeAgy();
     }
 
     private void show(boolean history) {
@@ -109,6 +139,12 @@ final class AssistantScreen extends Screen {
     }
 
     private void refresh() {
+        modeButton.setMessage(Component.literal(LocalAssistant.INSTANCE.modeLabel()));
+        boolean authorize = LocalAssistant.INSTANCE.needsAgyAuthorization();
+        agyButton.visible = authorize;
+        agyButton.active = available;
+        askButton.visible = !authorize;
+        askButton.active = available;
         conversationTab.active = showHistory;
         historyTab.active = available && !showHistory;
         if (showHistory) {

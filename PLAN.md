@@ -9,7 +9,7 @@ Remplace Gemini : chaque pote interroge le serveur avec sa propre IA (abonnement
 |---|---|---|
 | 1 | `minecraft-ia mcp` : MCP lecture seule, fichiers du jeu, statut live (ping) | fait 2026-10-05 |
 | 2 | exposition : Tailscale Funnel (pas de domaine), 1 lien secret/pote, révocable | en service 2026-10-05 (Funnel 443 → 8766, test externe OK) |
-| 3 | mod : écran `I` lance la CLI headless du pote (`claude -p`, `codex exec`, Antigravity CLI ?) branchée sur le MCP, outils MCP seuls ; TPS + positions joueurs (code serveur) | à faire |
+| 3 | mod : écran `I` lance la CLI headless du pote (`claude -p`, `codex exec`, `agy -p`) branchée sur le MCP, outils MCP seuls ; TPS + positions joueurs (code serveur) | code fait 2026-10-05 (v0.3.0) |
 | 4 | retrait Gemini + `/ia` ; pote sans abonnement payant = pas d'assistant (choix nistroy) | à faire |
 
 Vérifié 2026-10-05 :
@@ -41,6 +41,15 @@ potes sous Windows) :
   MCP + permission `mcp(minecraft-ia/*)` seulement en config globale (`~/.gemini/config/mcp_config.json`,
   `~/.gemini/antigravity-cli/settings.json`) ; `.agents/` = projet (règles, skills, plugins, hooks), pas de
   permissions. `agy` : pas de stdin (`-p` exige le texte en argument), sortie `--output-format json` → `response`.
+- Mod v0.3.0 : `cli/` (Java pur, JUnit) = `Executables` (PATH + PATHEXT, `~/.local/bin`, `%APPDATA%/npm` ; .cmd/.bat →
+  arguments sans `"&|<>^%!` ni saut de ligne), `CliCommand` (lignes verrouillées ci-dessus, jeton : fichier `mcp.json`
+  Claude / variable `MINECRAFT_IA_TOKEN` Codex / config globale agy), `CliRunner`, `CliOutput`, `AgyConfig` (refuse si
+  `toolPermission` ∉ {request-review, strict} ou règle allow ≠ `mcp(`/`read_url(`), `ClientConfig`
+  (`config/minecraft_ia-client.json` : `mode` auto/claude/codex/agy/server, chemins, lien). Client `LocalAssistant` ;
+  bouton de l'écran = choix de l'IA ; « Autoriser » = `agy mcp add` + règle, sur clic du joueur.
+- Testé 2026-10-05 sur le Mac (pipeline Java réel) : Claude Code 12 s, réponse tirée de la table de loot, `whoami`
+  refusé ; agy 60 s, statut via MCP, `whoami` refusé (config agy de nistroy restaurée après). Codex : non testé (absent
+  du Mac). Windows : non testé (lancement .cmd, chemins).
 
 ## But
 - Joueur pose question sur mods en jeu → réponse rapide, sourcée, sinon "je sais pas". Jamais inventer.

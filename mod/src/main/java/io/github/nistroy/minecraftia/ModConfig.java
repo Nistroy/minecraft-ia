@@ -13,7 +13,7 @@ import java.time.Duration;
 import java.util.Set;
 
 /** Config du mod serveur (config/minecraft_ia.json). Créée avec les défauts au premier lancement. */
-public record ModConfig(URI brainUrl, Path tokenFile, int maxQuestionLength, Duration timeout) {
+public record ModConfig(URI brainUrl, Path tokenFile, int maxQuestionLength, Duration timeout, Path liveStatusFile) {
     private static final Set<String> LOOPBACK = Set.of("127.0.0.1", "localhost", "[::1]");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
@@ -23,6 +23,7 @@ public record ModConfig(URI brainUrl, Path tokenFile, int maxQuestionLength, Dur
         String tokenFile = "~/.config/minecraft-ia/brain-token";
         int maxQuestionLength = 256;
         int timeoutSeconds = 90;
+        String liveStatusFile = "~/.local/share/minecraft-ia/live.json";
     }
 
     public static ModConfig load(Path file, Path home) throws IOException {
@@ -64,7 +65,14 @@ public record ModConfig(URI brainUrl, Path tokenFile, int maxQuestionLength, Dur
         if (raw.tokenFile == null || raw.tokenFile.isBlank()) {
             throw new IllegalArgumentException("tokenFile manquant");
         }
-        Path token = raw.tokenFile.startsWith("~/") ? home.resolve(raw.tokenFile.substring(2)) : Path.of(raw.tokenFile);
-        return new ModConfig(url, token, raw.maxQuestionLength, Duration.ofSeconds(raw.timeoutSeconds));
+        if (raw.liveStatusFile == null || raw.liveStatusFile.isBlank()) {
+            throw new IllegalArgumentException("liveStatusFile manquant");
+        }
+        return new ModConfig(url, path(raw.tokenFile, home), raw.maxQuestionLength, Duration.ofSeconds(raw.timeoutSeconds),
+                path(raw.liveStatusFile, home));
+    }
+
+    private static Path path(String value, Path home) {
+        return value.startsWith("~/") ? home.resolve(value.substring(2)) : Path.of(value);
     }
 }

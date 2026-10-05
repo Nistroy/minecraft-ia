@@ -2,6 +2,7 @@ package io.github.nistroy.minecraftia;
 
 import io.github.nistroy.minecraftia.net.AnswerPayload;
 import io.github.nistroy.minecraftia.net.HistoryPayload;
+import io.github.nistroy.minecraftia.net.LinkPayload;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -25,6 +26,7 @@ public final class Gateway {
     private final int maxQuestionLength;
     private final String disabledReason;
     private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> linksInFlight = ConcurrentHashMap.newKeySet();
 
     private Gateway(BrainClient brain, int maxQuestionLength, String disabledReason) {
         this.brain = brain;
@@ -90,6 +92,30 @@ public final class Gateway {
                 ServerPlayNetworking.send(target, HistoryPayload.of(items));
             } else {
                 ChatReplies.history(target, items);
+            }
+        }));
+    }
+
+    /** Lien MCP pour la CLI d'IA du joueur ; envoyé à lui seul, jamais dans le chat. */
+    public void mcpLink(ServerPlayer player) {
+        if (!ServerPlayNetworking.canSend(player, LinkPayload.TYPE)) {
+            return;
+        }
+        if (brain == null) {
+            ServerPlayNetworking.send(player, LinkPayload.of(McpLinkReply.failed(disabledReason)));
+            return;
+        }
+        UUID id = player.getUUID();
+        if (!linksInFlight.add(id)) {
+            return;
+        }
+        MinecraftServer server = player.getServer();
+        brain.mcpLink(id, player.getGameProfile().getName()).whenComplete((result, error) -> server.execute(() -> {
+            linksInFlight.remove(id);
+            ServerPlayer target = server.getPlayerList().getPlayer(id);
+            if (target != null) {
+                McpLinkReply reply = error == null ? result : McpLinkReply.failed(BrainClient.UNAVAILABLE);
+                ServerPlayNetworking.send(target, LinkPayload.of(reply));
             }
         }));
     }

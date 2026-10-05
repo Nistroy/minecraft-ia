@@ -14,5 +14,8 @@
   "screen.minecraft_ia.retry": "(new search)",
   "screen.minecraft_ia.sources": "Sources: ",
   "screen.minecraft_ia.vote_up": "Correct answer",
-  "screen.minecraft_ia.vote_down": "Wrong answer: search again"
+  "screen.minecraft_ia.vote_down": "Wrong answer: search again",
+  "screen.minecraft_ia.mode_tooltip": "Who answers: your AI CLI (your subscription, limited to the server MCP) or the server's Gemini. Click to switch.",
+  "screen.minecraft_ia.agy_authorize": "Authorize",
+  "screen.minecraft_ia.agy_tooltip": "Adds only the minecraft-ia MCP server and the mcp(minecraft-ia/*) rule to Antigravity's config. Nothing else is allowed."
 }
