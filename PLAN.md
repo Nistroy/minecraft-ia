@@ -3,6 +3,27 @@
 Design validé nistroy 2026-09-12 (ex-`IA.md` du dépôt `Nistroy/minecraft-server`). Code générique : n'importe quel
 modpack Fabric 1.21.1 ; connaissances d'un modpack = dépôt séparé.
 
+## Bascule MCP (validé nistroy 2026-10-05)
+Remplace Gemini : chaque pote interroge le serveur avec sa propre IA (abonnement Claude Pro / ChatGPT Plus / Antigravity).
+| Étape | Contenu | État |
+|---|---|---|
+| 1 | `minecraft-ia mcp` : MCP lecture seule, fichiers du jeu, statut live (ping) | fait 2026-10-05 |
+| 2 | exposition : Tailscale Funnel (pas de domaine), 1 lien secret/pote, révocable | à faire |
+| 3 | mod : écran `I` lance la CLI headless du pote (`claude -p`, `codex exec`, Antigravity CLI ?) branchée sur le MCP, outils MCP seuls ; TPS + positions joueurs (code serveur) | à faire |
+| 4 | retrait Gemini + `/ia` ; pote sans abonnement payant = pas d'assistant (choix nistroy) | à faire |
+
+Vérifié 2026-10-05 :
+- Claude : connecteur MCP perso dès le gratuit (1 seul), OAuth facultatif, appelé depuis le cloud Anthropic → URL publique
+  (support.claude.com 11175166). Claude Code (`-p`) : Pro minimum.
+- ChatGPT : mode développeur, MCP distant, auth « No Authentication » possible (developers.openai.com developer-mode).
+  Codex CLI : `codex exec`, MCP HTTP dans `~/.codex/config.toml`, offre Plus minimum.
+- Antigravity : MCP distant = clé `serverUrl` dans `~/.gemini/antigravity/mcp_config.json` (`url` ignoré sans erreur).
+- Gemini CLI : connexion Google gratuite fermée 2026-06-18 (geminicli.com quota-and-pricing).
+- Abonnement d'un pote ≠ API : jamais branché ailleurs que dans sa propre CLI/appli.
+
+Étape 2 pièges : log d'accès uvicorn écrit le chemin (secret dans l'URL → logs) ; `transport_security` du SDK filtre
+l'en-tête Host (ajouter le nom Funnel) ; positions des joueurs visibles par tout détenteur d'un lien.
+
 ## But
 - Joueur pose question sur mods en jeu → réponse rapide, sourcée, sinon "je sais pas". Jamais inventer.
 - IA note ce qu'elle trouve (notes md + statut) → répond plus vite ensuite.
@@ -29,6 +50,10 @@ modpack Fabric 1.21.1 ; connaissances d'un modpack = dépôt séparé.
 | Pas de base vectorielle | FTS + lecture des fiches par outil | exactitude noms/ID, debug facile |
 | Quotas | par joueur/jour + budget global d'appels LLM/jour, jour = minuit heure du Pacifique (reset RPD Google) ; configurables | limites free tier visibles seulement dans AI Studio |
 | Distribution mod | pack packwiz auto-maj du serveur, URL de release GitHub | aucune action des potes |
+| MCP | `minecraft-ia mcp`, Streamable HTTP `127.0.0.1:8766/mcp` (`mcp_port`), SDK `mcp==2.3.0` (`MCPServer`), sans état + JSON ; outils `Toolbox` sauf `save_note`/`answer` + `MCP_SPECS` ; erreur d'outil = `ToolError` (JSON) | lecture seule depuis l'extérieur ; aucun LLM côté serveur |
+| Fichiers du jeu | `extract` : texte `data/**.json\|mcfunction\|txt` des jars (+ imbriqués, vanilla), `fabric.mod.json` de 1er niveau, `config_dir` du serveur → tables `game_file`/`installed_mod` ; recherche sous-chaîne `instr` (≈35 000 fichiers, 50 Mo, < 0,1 s) | taux de drop, loot, spawn lus dans le vrai fichier ; plusieurs origines par chemin gardées (surcharge datapack) |
+| Configs à secret | fichier exclu en entier si clé `*token*`/`*password*`/`*secret*`/`api_key`/`webhook` (`_SECRET_KEY`) ou nom suspect ; caché/binaire/> 1 Mo exclus | 2026-10-05 : `minecraft_ia.json`, `resourceful-config-web.json` exclus |
+| Statut live | Server List Ping `127.0.0.1:minecraft_port` (`status.py`) : en ligne, version, MOTD, joueurs (échantillon vanilla) + mods installés | sans console ni RCON ; TPS + positions impossibles par ping → étape 3 |
 | Licence | GPL-3.0-only (code) · CC BY-SA 4.0 (connaissances) | choix nistroy 2026-09-12 |
 
 ## Architecture
@@ -70,6 +95,7 @@ historique) → réponse → payload écran ou message chat privé.
 - [ ] jeu de questions test : `minecraft-ia-kb/eval/questions.toml` (6 amorces) + vraies questions des potes ; `eval` = 0 invention
 - [x] cerveau lancé par `./mc start` du dépôt serveur (tmux `ia`, avant le serveur ; `stop` le laisse) — 2026-09-13
 - [ ] sauvegarde `brain.sqlite3`
+- [x] MCP lecture seule local (`minecraft-ia mcp`) : 11 outils, extraction réelle 139 jars / 34 739 fichiers, appels HTTP réels OK — 2026-10-05
 - [ ] `save_note` sans dédoublonnage : 2 notes crabe identiques dans kb (2026-09-13)
 
 ## Fiches : leçons

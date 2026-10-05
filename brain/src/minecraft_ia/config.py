@@ -27,6 +27,7 @@ class Config:
     github_token_file: Path | None = None
     mods_dir: Path | None = None
     vanilla_jar: Path | None = None
+    config_dir: Path | None = None  # configs des mods du serveur, lues par `extract` (secrets exclus)
     minecraft_version: str = "1.21.1"
     model: str = "gemini-3.8-flash"
     # Essayés dans l'ordre si le principal est saturé (503) ou à court de quota (429) ; quotas gratuits par modèle.
@@ -34,6 +35,8 @@ class Config:
     thinking_level: str = "high"
     host: str = "127.0.0.1"
     port: int = 8765
+    mcp_port: int = 8766
+    minecraft_port: int = 25565  # ping de statut sur 127.0.0.1
     # Défauts prudents : à caler sur la limite « requests per day » affichée dans AI Studio.
     questions_per_player_per_day: int = 20
     llm_calls_per_day: int = 200
@@ -44,9 +47,20 @@ class Config:
     display_timezone: str = "Europe/Paris"
 
 
-_PATHS = {"kb_path", "db_path", "gemini_key_file", "token_file", "github_token_file", "mods_dir", "vanilla_jar"}
+_PATHS = {
+    "kb_path",
+    "db_path",
+    "gemini_key_file",
+    "token_file",
+    "github_token_file",
+    "mods_dir",
+    "vanilla_jar",
+    "config_dir",
+}
 _POSITIVE_INTS = {
     "port",
+    "mcp_port",
+    "minecraft_port",
     "questions_per_player_per_day",
     "llm_calls_per_day",
     "max_tool_rounds",

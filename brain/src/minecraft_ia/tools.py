@@ -1,4 +1,5 @@
-"""Outils du LLM : connaissances locales, données exactes, Modrinth, GitHub.
+"""Outils du LLM : connaissances locales, données exactes, Modrinth, GitHub ; pour le MCP en plus, fichiers du jeu
+et statut du serveur en direct.
 
 Chaque résultat porte un identifiant `source` ; seules les sources vues ici peuvent être citées.
 """
@@ -21,6 +22,8 @@ from .markers import resource_ids
 _SLUG = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _REPO = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 _RESOURCE_ID = re.compile(r"^#?[a-z0-9_.-]+:[a-z0-9_./-]+$")
+READ_CHUNK = 20000
+MAX_LISTED_FILES = 200
 USER_AGENT = "Nistroy/minecraft-ia (https://github.com/Nistroy/minecraft-ia)"
 
 
@@ -72,6 +75,20 @@ class ToolContext:
 
 class BadArgs(ValueError):
     pass
+
+
+def _optional_text(args: dict, key: str, max_len: int) -> str:
+    value = args.get(key) or ""
+    if not isinstance(value, str):
+        raise BadArgs(f"argument `{key}` : texte attendu")
+    return value.strip()[:max_len]
+
+
+def _game_path(value: str) -> str:
+    path = value.lstrip("/")
+    if ".." in path.split("/"):
+        raise BadArgs("chemin invalide")
+    return path
 
 
 def _text(args: dict, key: str, max_len: int, default: str | None = None) -> str:
@@ -144,12 +161,41 @@ SPECS = [
     ),
 ]
 
+# Outils du MCP seulement : la liste de Gemini (`SPECS`) ne change pas.
+MCP_SPECS = [
+    ToolSpec(
+        "search_files",
+        "Cherche un texte (sans casse) dans les fichiers du jeu : data/ des jars (tables de loot, tags, worldgen, "
+        "recettes, advancements…), fabric.mod.json des mods, configs du serveur (config/...). "
+        "path_filter = morceau de chemin, ex. loot_table/entities.",
+        _obj({"query": _STR, "path_filter": _STR}, ["query"]),
+    ),
+    ToolSpec(
+        "list_files",
+        "Liste un dossier des fichiers du jeu (prefix vide = racine) : sous-dossiers avec leur nombre de fichiers, "
+        "fichiers avec les mods qui les fournissent.",
+        _obj({"prefix": _STR}, []),
+    ),
+    ToolSpec(
+        "read_file",
+        f"Lit un fichier du jeu par tranches de {READ_CHUNK} caractères (relancer avec offset = next_offset). "
+        "origin = id du mod, obligatoire si plusieurs mods fournissent le même chemin.",
+        _obj({"path": _STR, "origin": _STR, "offset": {"type": "integer"}}, ["path"]),
+    ),
+    ToolSpec(
+        "server_status",
+        "Serveur en direct : en ligne ou non, version, MOTD, joueurs connectés, mods installés avec leur version.",
+        _obj({}, []),
+    ),
+]
+
 
 class Toolbox:
-    def __init__(self, db: Database, kb: KnowledgeBase, http: Http) -> None:
+    def __init__(self, db: Database, kb: KnowledgeBase, http: Http, status: Callable[[], dict] | None = None) -> None:
         self._db = db
         self._kb = kb
         self._http = http
+        self._status = status
         self._handlers: dict[str, Callable[[dict, ToolContext], dict]] = {
             "search_knowledge": self._search_knowledge,
             "read_fiche": self._read_fiche,
@@ -159,6 +205,10 @@ class Toolbox:
             "github_readme": self._github_readme,
             "github_issues": self._github_issues,
             "save_note": self._save_note,
+            "search_files": self._search_files,
+            "list_files": self._list_files,
+            "read_file": self._read_file,
+            "server_status": self._server_status,
         }
 
     def specs(self) -> list[ToolSpec]:
@@ -246,6 +296,80 @@ class Toolbox:
                 }
             )
         return {"recipes": out}
+
+    # --- fichiers du jeu ---------------------------------------------------------------------------
+
+    def _search_files(self, args: dict, ctx: ToolContext) -> dict:
+        hits = self._db.search_game_files(
+            _text(args, "query", 200), limit=20, path_filter=_optional_text(args, "path_filter", 200)
+        )
+        results = []
+        for hit in hits:
+            source = f"file:{hit.origin}/{hit.path}"
+            ctx.seen.add(source)
+            results.append({"source": source, "origin": hit.origin, "path": hit.path, "lines": hit.lines})
+        return {"results": results}
+
+    def _list_files(self, args: dict, ctx: ToolContext) -> dict:
+        prefix = _game_path(_optional_text(args, "prefix", 300))
+        if prefix and not prefix.endswith("/"):
+            prefix += "/"
+        dirs: dict[str, int] = {}
+        files: dict[str, list[str]] = {}
+        for origin, path in self._db.game_paths(prefix):
+            rest = path[len(prefix) :]
+            if "/" in rest:
+                folder = rest.split("/", 1)[0] + "/"
+                dirs[folder] = dirs.get(folder, 0) + 1
+            else:
+                files.setdefault(path, []).append(origin)
+        listed = [{"path": path, "origins": origins} for path, origins in files.items()]
+        result = {"prefix": prefix, "dirs": dirs, "files": listed[:MAX_LISTED_FILES]}
+        if len(listed) > MAX_LISTED_FILES:
+            result["more_files"] = len(listed) - MAX_LISTED_FILES
+        return result
+
+    def _read_file(self, args: dict, ctx: ToolContext) -> dict:
+        path = _game_path(_text(args, "path", 300))
+        origin = _optional_text(args, "origin", 100)
+        offset = args.get("offset", 0)
+        if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
+            raise BadArgs("offset : entier >= 0 attendu")
+        files = self._db.game_files(path)
+        if not files:
+            return {"error": "fichier introuvable (voir search_files ou list_files)"}
+        origins = [f.origin for f in files]
+        if origin:
+            files = [f for f in files if f.origin == origin]
+            if not files:
+                return {"error": f"origine inconnue pour ce fichier : {', '.join(origins)}", "origins": origins}
+        elif len(files) > 1:
+            return {
+                "error": f"plusieurs mods fournissent ce fichier, préciser origin parmi : {', '.join(origins)}",
+                "origins": origins,
+            }
+        file = files[0]
+        source = f"file:{file.origin}/{file.path}"
+        ctx.seen.add(source)
+        end = offset + READ_CHUNK
+        return {
+            "source": source,
+            "origin": file.origin,
+            "path": file.path,
+            "other_origins": [o for o in origins if o != file.origin],
+            "content": file.content[offset:end],
+            "total_chars": len(file.content),
+            "next_offset": end if end < len(file.content) else None,
+        }
+
+    # --- serveur en direct ------------------------------------------------------------------------
+
+    def _server_status(self, args: dict, ctx: ToolContext) -> dict:
+        if self._status is None:
+            return {"error": "statut du serveur indisponible"}
+        ctx.seen.add("live:server")
+        mods = [{"id": mod, "version": version} for mod, version in self._db.installed_mods()]
+        return {"source": "live:server", **self._status(), "mods": mods}
 
     # --- web (API ciblées, versions vérifiables) --------------------------------------------------
 

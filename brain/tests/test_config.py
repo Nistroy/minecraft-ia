@@ -58,3 +58,13 @@ def test_ensure_token_creates_private_file_once(tmp_path):
     assert len(token) >= 32
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert ensure_token(path) == token
+
+
+def test_mcp_and_live_status_settings(tmp_path):
+    base = 'kb_path = "kb"\ndb_path = "b.sqlite3"\n'
+    cfg = load_config(write(tmp_path / "a.toml", base))
+    assert (cfg.mcp_port, cfg.minecraft_port, cfg.config_dir) == (8766, 25565, None)
+    cfg = load_config(write(tmp_path / "b.toml", base + 'config_dir = "server/config"\nmcp_port = 9000\n'))
+    assert cfg.config_dir == tmp_path / "server/config" and cfg.mcp_port == 9000
+    with pytest.raises(ConfigError):
+        load_config(write(tmp_path / "c.toml", base + "minecraft_port = 0\n"))

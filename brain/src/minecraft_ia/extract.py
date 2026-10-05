@@ -1,4 +1,5 @@
-"""Extraction des données exactes des jars : noms FR/EN (items, blocs, mobs) et recettes.
+"""Extraction des données exactes des jars : noms FR/EN (items, blocs, mobs), recettes et fichiers texte de `data/`
+(tables de loot, tags, worldgen…) ; plus les configs du serveur, sans les fichiers qui contiennent un secret.
 
 Résultat en SQLite local seulement : contenu des mods, jamais commité ni redistribué.
 """
@@ -11,12 +12,13 @@ import logging
 import re
 import zipfile
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
 
-from .db import Item, Recipe
+from .db import GameFile, Item, Recipe
 
 log = logging.getLogger(__name__)
 
@@ -28,12 +30,44 @@ _NESTED_JAR = re.compile(r"^META-INF/jars/[^/]+\.jar$")
 _VANILLA_INNER = re.compile(r"^META-INF/versions/[^/]+/server-[^/]+\.jar$")
 _INGREDIENT_KEYS = ("key", "ingredients", "ingredient", "base", "addition", "template")
 _LANG_FIELD = {"en_us": "en", "fr_fr": "fr"}
+_DATA_TEXT = re.compile(r"^data/[a-z0-9_.-]+/\S+\.(json|mcfunction|txt)$")
+MAX_FILE_BYTES = 1_000_000
+_CONFIG_SUFFIXES = frozenset({".json", ".json5", ".toml", ".yaml", ".yml", ".properties", ".cfg", ".txt", ".snbt"})
+# Clé de secret (`password`, `tokenFile`, `Discord_Token`, `rcon.password`…) → fichier exclu en entier.
+# Les mots seulement en valeur (`"name": "Secret Room"`) ou au milieu d'un chemin ne comptent pas.
+_SECRET_KEY = re.compile(
+    r"""(?:^|[{,\s])["']?[\w.-]*(?:token|password|passwd|secret|api_?key|webhook)\w*["']?\s*[:=]""", re.I | re.M
+)
+_SECRET_NAME = re.compile(r"token|secret|password|credential", re.I)
+
+
+@dataclass(frozen=True)
+class Extracted:
+    items: list[Item]
+    recipes: list[Recipe]
+    files: list[GameFile]
+    mods: list[tuple[str, str | None]]  # jars de premier niveau : (id, version)
 
 
 class _Collector:
     def __init__(self) -> None:
         self.names: dict[tuple[str, str], dict[str, str | None]] = {}
         self.recipes: dict[str, Recipe] = {}
+        self.files: dict[tuple[str, str], GameFile] = {}
+        self.mods: list[tuple[str, str | None]] = []
+
+    def add_file(self, origin: str, path: str, raw: bytes) -> None:
+        try:
+            self.files.setdefault((origin, path), GameFile(origin, path, raw.decode("utf-8-sig")))
+        except UnicodeDecodeError:
+            log.debug("fichier non UTF-8 ignoré : %s", path)
+
+    def add_mod(self, z: zipfile.ZipFile, mod: str) -> None:
+        meta = _load_json(z, "fabric.mod.json") if "fabric.mod.json" in z.namelist() else None
+        version = meta.get("version") if isinstance(meta, dict) else None
+        self.mods.append((mod, version if isinstance(version, str) else None))
+        if meta is not None:
+            self.add_file(mod, "fabric.mod.json", z.read("fabric.mod.json"))
 
     def add_name(self, key: str, value: Any, lang: str, mod: str) -> None:
         match = _LANG_KEY.match(key)
@@ -92,7 +126,10 @@ def _ingredients(value: Any, found: set[str]) -> None:
 
 
 def _scan(z: zipfile.ZipFile, mod: str, out: _Collector, depth: int = 0) -> None:
-    for name in z.namelist():
+    for info in z.infolist():
+        name = info.filename
+        if _DATA_TEXT.match(name) and info.file_size <= MAX_FILE_BYTES:
+            out.add_file(mod, name, z.read(name))
         if lang := _LANG_FILE.match(name):
             data = _load_json(z, name)
             if isinstance(data, dict):
@@ -126,6 +163,11 @@ def _scan(z: zipfile.ZipFile, mod: str, out: _Collector, depth: int = 0) -> None
 def extract(
     jars: Iterable[Path], vanilla_jar: Path | None, vanilla_lang_fr: dict | None
 ) -> tuple[list[Item], list[Recipe]]:
+    data = extract_all(jars, vanilla_jar, vanilla_lang_fr)
+    return data.items, data.recipes
+
+
+def extract_all(jars: Iterable[Path], vanilla_jar: Path | None, vanilla_lang_fr: dict | None) -> Extracted:
     out = _Collector()
     if vanilla_jar is not None:
         with zipfile.ZipFile(vanilla_jar) as bundler:
@@ -141,10 +183,41 @@ def extract(
     for jar in sorted(jars):
         try:
             with zipfile.ZipFile(jar) as z:
-                _scan(z, _mod_id(z, jar.stem), out)
+                mod = _mod_id(z, jar.stem)
+                out.add_mod(z, mod)
+                _scan(z, mod, out)
         except zipfile.BadZipFile:
             log.warning("jar illisible ignoré : %s", jar.name)
-    return out.items(), sorted(out.recipes.values(), key=lambda r: r.id)
+    return Extracted(
+        out.items(),
+        sorted(out.recipes.values(), key=lambda r: r.id),
+        sorted(out.files.values(), key=lambda f: (f.path, f.origin)),
+        sorted(out.mods),
+    )
+
+
+def config_files(config_dir: Path) -> list[GameFile]:
+    """Configs texte du serveur (`config/...`), origine `config`. Fichier caché, binaire, énorme ou à secret : exclu."""
+    files = []
+    for path in sorted(config_dir.rglob("*")):
+        rel = path.relative_to(config_dir)
+        if (
+            not path.is_file()
+            or path.suffix.lower() not in _CONFIG_SUFFIXES
+            or any(part.startswith(".") for part in rel.parts)
+            or _SECRET_NAME.search(path.name)
+            or path.stat().st_size > MAX_FILE_BYTES
+        ):
+            continue
+        try:
+            content = path.read_text(encoding="utf-8-sig")
+        except UnicodeDecodeError:
+            continue
+        if _SECRET_KEY.search(content):
+            log.info("config ignorée (clé de secret) : %s", rel)
+            continue
+        files.append(GameFile("config", f"config/{rel.as_posix()}", content))
+    return files
 
 
 def fetch_vanilla_lang(version: str, lang: str, client: httpx.Client) -> dict:

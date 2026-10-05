@@ -1,6 +1,6 @@
 import pytest
 
-from minecraft_ia.db import Item, KbDoc, Recipe
+from minecraft_ia.db import GameFile, Item, KbDoc, Recipe
 from minecraft_ia.kb import KnowledgeBase
 from minecraft_ia.llm import ToolCall
 from minecraft_ia.tools import Toolbox, ToolContext
@@ -169,3 +169,76 @@ def test_kb_hits_for_notes_carry_note_source(db, kb_root):
     result, ctx = run(box, "search_knowledge", query="briquet")
     assert result["results"][0]["source"] == "note:notes/aether/2026-09-12-0123abcd.md"
     assert "note:notes/aether/2026-09-12-0123abcd.md" in ctx.seen
+
+
+ZOMBIE = "data/minecraft/loot_table/entities/zombie.json"
+
+
+@pytest.fixture
+def filebox(db, kb_root):
+    db.replace_game_files(
+        [
+            GameFile("minecraft", ZOMBIE, '{"item": "minecraft:rotten_flesh"}'),
+            GameFile("zombies", ZOMBIE, '{"item": "zombies:brain"}'),
+            GameFile("zombies", "data/zombies/loot_table/entities/ghoul.json", "g" * 30000),
+            GameFile("zombies", "fabric.mod.json", '{"id": "zombies"}'),
+            GameFile("config", "config/zombies.toml", "brain_drop_chance = 0.25"),
+        ],
+        mods=[("zombies", "1.2.0")],
+    )
+    status = {"online": True, "version": "1.21.1", "players_online": 1, "players_max": 5, "players": ["Steve"]}
+    return Toolbox(db, KnowledgeBase(kb_root), FakeHttp({}), status=lambda: status)
+
+
+def test_search_files_registers_file_sources(filebox):
+    result, ctx = run(filebox, "search_files", query="rotten_flesh")
+    assert result["results"] == [
+        {
+            "source": f"file:minecraft/{ZOMBIE}",
+            "origin": "minecraft",
+            "path": ZOMBIE,
+            "lines": ['{"item": "minecraft:rotten_flesh"}'],
+        }
+    ]
+    assert f"file:minecraft/{ZOMBIE}" in ctx.seen
+    assert "error" in run(filebox, "search_files", query="  ")[0]
+
+
+def test_list_files_groups_by_directory(filebox):
+    root, _ = run(filebox, "list_files")
+    assert root["dirs"] == {"config/": 1, "data/": 3}
+    assert root["files"] == [{"path": "fabric.mod.json", "origins": ["zombies"]}]
+    entities, _ = run(filebox, "list_files", prefix="/data/minecraft/loot_table/entities")
+    assert entities["dirs"] == {}
+    assert entities["files"] == [{"path": ZOMBIE, "origins": ["minecraft", "zombies"]}]
+    assert "error" in run(filebox, "list_files", prefix="data/../config")[0]
+
+
+def test_read_file_pages_and_disambiguates_origins(filebox):
+    ambiguous, ctx = run(filebox, "read_file", path=ZOMBIE)
+    assert ambiguous["origins"] == ["minecraft", "zombies"] and "error" in ambiguous and not ctx.seen
+    result, ctx = run(filebox, "read_file", path=ZOMBIE, origin="zombies")
+    assert result["content"] == '{"item": "zombies:brain"}' and result["next_offset"] is None
+    assert f"file:zombies/{ZOMBIE}" in ctx.seen
+    first, _ = run(filebox, "read_file", path="data/zombies/loot_table/entities/ghoul.json")
+    assert len(first["content"]) == 20000 and first["next_offset"] == 20000 and first["total_chars"] == 30000
+    second, _ = run(filebox, "read_file", path="data/zombies/loot_table/entities/ghoul.json", offset=20000)
+    assert len(second["content"]) == 10000 and second["next_offset"] is None
+    assert "error" in run(filebox, "read_file", path="data/nope.json")[0]
+
+
+def test_server_status_adds_installed_mods(filebox):
+    result, ctx = run(filebox, "server_status")
+    assert result["online"] is True and result["players"] == ["Steve"]
+    assert result["mods"] == [{"id": "zombies", "version": "1.2.0"}]
+    assert "live:server" in ctx.seen
+
+
+def test_server_status_without_provider_is_an_error(db, kb_root):
+    box = Toolbox(db, KnowledgeBase(kb_root), FakeHttp({}))
+    assert "error" in run(box, "server_status")[0]
+
+
+def test_gemini_specs_unchanged_by_mcp_only_tools(toolbox):
+    names = {s.name for s in toolbox[0].specs()}
+    assert not names & {"search_files", "list_files", "read_file", "server_status"}

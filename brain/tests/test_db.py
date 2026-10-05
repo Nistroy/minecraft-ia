@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from minecraft_ia.db import Database, Item, KbDoc, Recipe
+from minecraft_ia.db import Database, GameFile, Item, KbDoc, Recipe
 
 PLAYER = "0f1e2d3c-0000-0000-0000-000000000001"
 
@@ -123,3 +123,53 @@ def test_kb_index_search_tolerates_fts_syntax(db):
     assert [h.path for h in hits] == ["mods/aether.md"]
     assert db.search_kb("peche", limit=5)[0].slug == "tide"
     assert db.search_kb("   ", limit=5) == []
+
+
+ZOMBIE = "data/minecraft/loot_table/entities/zombie.json"
+
+
+@pytest.fixture
+def game_db(db):
+    db.replace_game_files(
+        [
+            GameFile("minecraft", ZOMBIE, '{\n  "pools": [\n    {"item": "minecraft:rotten_flesh"}\n  ]\n}'),
+            GameFile("zombies", ZOMBIE, '{"pools": [{"item": "zombies:brain"}]}'),
+            GameFile("zombies", "data/zombies/loot_table/entities/ghoul.json", '{"item": "minecraft:Rotten_Flesh"}'),
+            GameFile("zombies", "fabric.mod.json", '{"id": "zombies", "version": "1.2.0"}'),
+            GameFile("lib", "data/lib/tags/item/x.json", "{}"),
+            GameFile("config", "config/zombies.toml", "brain_drop_chance = 0.25"),
+        ],
+        mods=[("zombies", "1.2.0")],
+    )
+    return db
+
+
+def test_search_game_files_matches_content_case_insensitively(game_db):
+    hits = game_db.search_game_files("ROTTEN_FLESH", path_filter="loot_table", limit=10)
+    assert [(h.origin, h.path) for h in hits] == [
+        ("minecraft", ZOMBIE),
+        ("zombies", "data/zombies/loot_table/entities/ghoul.json"),
+    ]
+    assert hits[0].lines == ['{"item": "minecraft:rotten_flesh"}']
+    assert game_db.search_game_files("rotten_flesh", path_filter="config/", limit=10) == []
+
+
+def test_search_game_files_matches_paths_and_limits(game_db):
+    assert [h.path for h in game_db.search_game_files("ghoul", limit=10)] == [
+        "data/zombies/loot_table/entities/ghoul.json"
+    ]
+    assert len(game_db.search_game_files("{", limit=2)) == 2
+
+
+def test_game_file_lookup_and_prefix_listing(game_db):
+    assert [f.origin for f in game_db.game_files(ZOMBIE)] == ["minecraft", "zombies"]
+    assert game_db.game_files("data/nope.json") == []
+    assert game_db.game_paths("data/minecraft/") == [("minecraft", ZOMBIE), ("zombies", ZOMBIE)]
+    # Préfixe littéral : `_` et `%` ne sont pas des jokers.
+    assert game_db.game_paths("data/%") == []
+
+
+def test_installed_mods_and_replace_clears(game_db):
+    assert game_db.installed_mods() == [("zombies", "1.2.0")]
+    game_db.replace_game_files([], mods=[])
+    assert game_db.game_paths("") == [] and game_db.installed_mods() == []

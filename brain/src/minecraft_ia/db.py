@@ -38,6 +38,20 @@ class Recipe:
 
 
 @dataclass(frozen=True)
+class GameFile:
+    origin: str  # id du mod, `minecraft` ou `config`
+    path: str
+    content: str
+
+
+@dataclass(frozen=True)
+class FileHit:
+    origin: str
+    path: str
+    lines: list[str]
+
+
+@dataclass(frozen=True)
 class KbDoc:
     path: str
     slug: str
@@ -305,6 +319,54 @@ class Database:
                 for r in rows
             }
         return [Recipe(r["id"], r["mod"], r["type"], r["result"], inputs[r["id"]], r["json"]) for r in rows]
+
+    # --- fichiers du jeu -------------------------------------------------------------------------
+
+    def replace_game_files(self, files: Iterable[GameFile], mods: Iterable[tuple[str, str | None]]) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM game_file")
+            self._conn.execute("DELETE FROM installed_mod")
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO game_file (origin, path, content) VALUES (?, ?, ?)",
+                [(f.origin, f.path, f.content) for f in files],
+            )
+            self._conn.executemany("INSERT OR REPLACE INTO installed_mod (id, version) VALUES (?, ?)", mods)
+
+    def search_game_files(self, query: str, limit: int, path_filter: str = "") -> list[FileHit]:
+        """Sous-chaîne sans casse (ASCII) dans le contenu ou le chemin ; 3 lignes trouvées max par fichier."""
+        needle = query.lower()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT origin, path, content FROM game_file"
+                " WHERE (instr(lower(content), ?) OR instr(lower(path), ?)) AND instr(path, ?)"
+                " ORDER BY path, origin LIMIT ?",
+                (needle, needle, path_filter, limit),
+            ).fetchall()
+        hits = []
+        for r in rows:
+            lines = [line.strip()[:200] for line in r["content"].splitlines() if needle in line.lower()]
+            hits.append(FileHit(r["origin"], r["path"], lines[:3]))
+        return hits
+
+    def game_files(self, path: str) -> list[GameFile]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT origin, path, content FROM game_file WHERE path = ? ORDER BY origin", (path,)
+            ).fetchall()
+        return [GameFile(r["origin"], r["path"], r["content"]) for r in rows]
+
+    def game_paths(self, prefix: str) -> list[tuple[str, str]]:
+        """(origine, chemin) des fichiers dont le chemin commence par `prefix` (littéral, sans jokers)."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT origin, path FROM game_file WHERE substr(path, 1, length(?)) = ? ORDER BY path, origin",
+                (prefix, prefix),
+            ).fetchall()
+        return [(r["origin"], r["path"]) for r in rows]
+
+    def installed_mods(self) -> list[tuple[str, str | None]]:
+        with self._lock:
+            return [tuple(r) for r in self._conn.execute("SELECT id, version FROM installed_mod ORDER BY id")]
 
     # --- index des connaissances ------------------------------------------------------------------
 
