@@ -68,3 +68,14 @@ def test_revoked_player_cannot_self_provision_until_re_added(store):
     token = store.add("steve")  # nistroy rouvre l'accès à la main
     assert store.match(token) == "steve"
     assert store.match(store.provision("steve")) == "steve"
+
+
+def test_block_prevents_auto_provision_even_without_existing_link(store):
+    store.block("steve-jeu")
+    with pytest.raises(LinkError):
+        store.provision("steve-jeu")
+    active = store.provision("alex-jeu")
+    store.block("alex-jeu")
+    assert store.match(active) is None and store.names() == []
+    with pytest.raises(LinkError):
+        store.block("Pas Valide")

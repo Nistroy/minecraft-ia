@@ -90,6 +90,12 @@ class LinkStore:
             raise LinkError(f"aucun lien pour {name}")
         self._save({**self._load(), name: _REVOKED})
 
+    def block(self, name: str) -> None:
+        """Comme `revoke`, même sans lien actif : empêche le mod d'en créer un pour ce nom."""
+        if not _NAME.match(name):
+            raise LinkError("nom attendu : 1 à 32 caractères a-z 0-9 _ -")
+        self._save({**self._load(), name: _REVOKED})
+
     def _issue(self, name: str) -> str:
         if not _NAME.match(name):
             raise LinkError("nom attendu : 1 à 32 caractères a-z 0-9 _ -")
