@@ -8,7 +8,7 @@ Remplace Gemini : chaque pote interroge le serveur avec sa propre IA (abonnement
 | Étape | Contenu | État |
 |---|---|---|
 | 1 | `minecraft-ia mcp` : MCP lecture seule, fichiers du jeu, statut live (ping) | fait 2026-10-05 |
-| 2 | exposition : Tailscale Funnel (pas de domaine), 1 lien secret/pote, révocable | code fait 2026-10-05 |
+| 2 | exposition : Tailscale Funnel (pas de domaine), 1 lien secret/pote, révocable | en service 2026-10-05 (Funnel 443 → 8766, test externe OK) |
 | 3 | mod : écran `I` lance la CLI headless du pote (`claude -p`, `codex exec`, Antigravity CLI ?) branchée sur le MCP, outils MCP seuls ; TPS + positions joueurs (code serveur) | à faire |
 | 4 | retrait Gemini + `/ia` ; pote sans abonnement payant = pas d'assistant (choix nistroy) | à faire |
 
