@@ -136,7 +136,9 @@ class _Handler(BaseHTTPRequestHandler):
             raise BadRequest("name")
         if self.links is None or self.public_host is None:
             raise McpUnavailable
-        return {"url": f"https://{self.public_host}/mcp", "token": self.links.provision(name.lower())}
+        # Nom distinct du lien créé à la main (`mcp-link add <pseudo>`) : le régénérer ne casse pas celui-là.
+        token = self.links.provision(f"{name.lower()}-jeu")
+        return {"url": f"https://{self.public_host}/mcp", "token": token}
 
     def _send(self, status: int, payload: Any) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode()

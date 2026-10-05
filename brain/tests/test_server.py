@@ -113,13 +113,14 @@ def test_mcp_link_provisions_lowercased_player_link(link_server):
     r = client.post("/mcp-link", json={"player": PLAYER, "name": "Steve"})
     assert r.status_code == 200
     body = r.json()
-    assert body["url"] == "https://mc.example.ts.net/mcp" and links.match(body["token"]) == "steve"
+    # Suffixe -jeu : ne remplace pas un lien créé à la main (`mcp-link add steve`) collé dans Claude web.
+    assert body["url"] == "https://mc.example.ts.net/mcp" and links.match(body["token"]) == "steve-jeu"
 
 
 def test_mcp_link_refused_when_revoked_or_invalid(link_server):
     client, links = link_server
     client.post("/mcp-link", json={"player": PLAYER, "name": "Steve"})
-    links.revoke("steve")
+    links.revoke("steve-jeu")
     assert client.post("/mcp-link", json={"player": PLAYER, "name": "Steve"}).status_code == 403
     assert client.post("/mcp-link", json={"player": PLAYER, "name": "Steve; rm"}).status_code == 400
     assert httpx.post(client.base_url.join("/mcp-link"), json={"player": PLAYER, "name": "Alex"}).status_code == 401

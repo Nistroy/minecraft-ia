@@ -29,7 +29,7 @@ Positions des joueurs visibles par tout détenteur d'un lien.
 
 Étape 3 (choix nistroy 2026-10-05 : Claude Code + Codex + Antigravity, tous restreints au MCP ; lien automatique ;
 potes sous Windows) :
-- Lien auto : mod → `POST /mcp-link` cerveau (`player`, `name`) → `LinkStore.provision` (nouveau jeton, ancien mort) →
+- Lien auto : mod → `POST /mcp-link` cerveau (`player`, `name`) → `LinkStore.provision("<pseudo>-jeu")` (nouveau jeton, ancien mort ; nom distinct du lien manuel `<pseudo>`) →
   `{url: https://<public_host>/mcp, token}` ; jeton envoyé par `Authorization: Bearer` (pas dans les arguments).
   `revoke` laisse une marque `revoked` : plus de lien auto tant que `mcp-link add` n'a pas rouvert.
 - Live : mod serveur écrit `live_status_file` (JSON `updated`, `tps`, `mspt`, `players[name, dimension, x, y, z]`)
