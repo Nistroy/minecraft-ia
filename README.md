@@ -43,6 +43,13 @@ cp config.example.toml ~/.config/minecraft-ia/config.toml   # puis adapter les c
 # Au premier démarrage : config/minecraft_ia.json (adresse du cerveau, chemin du jeton, limites).
 ```
 
+### Serveur MCP (lecture seule)
+
+`minecraft-ia mcp` expose les mêmes outils, plus la lecture des fichiers du jeu (tables de loot, tags, configs des
+mods) et l'état du serveur (en ligne, version, joueurs connectés), à l'IA de chaque joueur : Claude, ChatGPT,
+Antigravity… Aucun LLM ne tourne sur le serveur ; rien ne peut y être écrit. Il n'écoute que sur `127.0.0.1` :
+l'exposer sur internet passe par un tunnel HTTPS (à venir).
+
 Tester sans Minecraft : `minecraft-ia ask "comment aller dans l'Aether ?"`. Mesurer la qualité :
 `minecraft-ia eval questions.toml` (questions attendues + pièges qui doivent donner « je sais pas »).
 

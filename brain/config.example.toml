@@ -7,6 +7,7 @@ db_path = "~/.local/share/minecraft-ia/brain.sqlite3"  # historique joueurs : à
 # Données exactes (minecraft-ia extract)
 mods_dir = "~/minecraft-server/server/mods"
 vanilla_jar = "~/minecraft-server/server/versions/1.21.1/server-1.21.1.jar"
+config_dir = "~/minecraft-server/server/config"  # configs des mods ; fichiers contenant un secret exclus
 minecraft_version = "1.21.1"
 
 # Secrets : fichiers hors dépôt, jamais affichés
@@ -23,6 +24,8 @@ fallback_models = ["gemini-3.7-flash", "gemini-3.5-flash"]
 
 # API locale (toujours 127.0.0.1)
 port = 8765
+mcp_port = 8766         # minecraft-ia mcp → http://127.0.0.1:8766/mcp
+minecraft_port = 25565  # statut du serveur (ping), lu sur 127.0.0.1
 
 # Quotas : caler sur « requests per day » affiché dans AI Studio. 1 question ≈ 2 à 8 appels LLM.
 questions_per_player_per_day = 20

@@ -1,4 +1,4 @@
-"""CLI du cerveau : serve, ask, extract, kb index, eval."""
+"""CLI du cerveau : serve, mcp, ask, extract, kb index, eval."""
 
 from __future__ import annotations
 
@@ -14,10 +14,12 @@ from .assistant import Assistant, Limits
 from .config import DEFAULT_CONFIG, Config, ConfigError, ensure_token, load_config, read_secret
 from .db import Database
 from .evaluation import load_questions, run_eval
-from .extract import extract, fetch_vanilla_lang
+from .extract import config_files, extract_all, fetch_vanilla_lang
 from .kb import KnowledgeBase
 from .llm import LLM, GeminiLLM
+from .mcp_server import build_mcp, serve_mcp
 from .server import make_server
+from .status import server_status
 from .tools import HttpxClient, Toolbox
 
 log = logging.getLogger("minecraft_ia")
@@ -32,8 +34,12 @@ def gemini_from_config(config: Config) -> list[LLM]:
     return [GeminiLLM(key, model, config.thinking_level) for model in (config.model, *config.fallback_models)]
 
 
-def build_assistant(config: Config, db: Database, kb: KnowledgeBase, llms: Sequence[LLM], **limits: int) -> Assistant:
+def build_toolbox(config: Config, db: Database, kb: KnowledgeBase) -> Toolbox:
     github_token = read_secret(config.github_token_file) if config.github_token_file else None
+    return Toolbox(db, kb, HttpxClient(github_token), status=lambda: server_status("127.0.0.1", config.minecraft_port))
+
+
+def build_assistant(config: Config, db: Database, kb: KnowledgeBase, llms: Sequence[LLM], **limits: int) -> Assistant:
     defaults = {
         "questions_per_player_per_day": config.questions_per_player_per_day,
         "llm_calls_per_day": config.llm_calls_per_day,
@@ -45,7 +51,7 @@ def build_assistant(config: Config, db: Database, kb: KnowledgeBase, llms: Seque
         db,
         kb,
         llms,
-        Toolbox(db, kb, HttpxClient(github_token)),
+        build_toolbox(config, db, kb),
         Limits(**{**defaults, **limits}, display_timezone=config.display_timezone),
     )
 
@@ -65,14 +71,18 @@ def cmd_kb_index(args: argparse.Namespace, config: Config, db: Database, llm_fac
 def cmd_extract(args: argparse.Namespace, config: Config, db: Database, llm_factory: LlmFactory) -> int:
     if config.mods_dir is None and config.vanilla_jar is None:
         raise ConfigError("extract demande mods_dir et/ou vanilla_jar dans la config")
+    if config.config_dir is not None and not config.config_dir.is_dir():
+        raise ConfigError(f"config_dir introuvable : {config.config_dir}")
     jars = sorted(config.mods_dir.glob("*.jar")) if config.mods_dir else []
     lang_fr = None
     if config.vanilla_jar is not None and not args.no_vanilla_fr:
         with httpx.Client(timeout=30, follow_redirects=True) as client:
             lang_fr = fetch_vanilla_lang(config.minecraft_version, "fr_fr", client)
-    items, recipes = extract(jars, config.vanilla_jar, lang_fr)
-    db.replace_exact_data(items, recipes)
-    print(f"{len(jars)} jars : {len(items)} noms, {len(recipes)} recettes")
+    data = extract_all(jars, config.vanilla_jar, lang_fr)
+    files = data.files + (config_files(config.config_dir) if config.config_dir else [])
+    db.replace_exact_data(data.items, data.recipes)
+    db.replace_game_files(files, data.mods)
+    print(f"{len(jars)} jars : {len(data.items)} noms, {len(data.recipes)} recettes, {len(files)} fichiers")
     return 0
 
 
@@ -102,6 +112,14 @@ def cmd_serve(args: argparse.Namespace, config: Config, db: Database, llm_factor
     return 0
 
 
+def cmd_mcp(args: argparse.Namespace, config: Config, db: Database, llm_factory: LlmFactory) -> int:
+    kb = KnowledgeBase(config.kb_path, push=config.kb_push)
+    _reindex(db, kb)
+    log.info("MCP prêt sur http://%s:%d/mcp", config.host, config.mcp_port)
+    serve_mcp(build_mcp(build_toolbox(config, db, kb)), config.host, config.mcp_port)
+    return 0
+
+
 def cmd_eval(args: argparse.Namespace, config: Config, db: Database, llm_factory: LlmFactory) -> int:
     questions = load_questions(args.questions)
     kb = KnowledgeBase(config.kb_path, push=config.kb_push)
@@ -116,7 +134,7 @@ def cmd_eval(args: argparse.Namespace, config: Config, db: Database, llm_factory
     return 0 if report.invented == 0 else 1
 
 
-COMMANDS = {"serve": cmd_serve, "ask": cmd_ask, "extract": cmd_extract, "eval": cmd_eval}
+COMMANDS = {"serve": cmd_serve, "mcp": cmd_mcp, "ask": cmd_ask, "extract": cmd_extract, "eval": cmd_eval}
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -125,6 +143,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("serve", help="API locale pour le mod serveur")
+    sub.add_parser("mcp", help="serveur MCP local en lecture seule (outils sans LLM)")
     sub.add_parser("ask", help="pose une question en console").add_argument("question")
     sub.add_parser("extract", help="données exactes depuis les jars").add_argument(
         "--no-vanilla-fr", action="store_true", help="ne pas télécharger les noms FR vanilla"
