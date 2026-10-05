@@ -146,6 +146,9 @@ def cmd_mcp_link(args: argparse.Namespace, config: Config, db: Database, llm_fac
         elif args.link_command == "revoke":
             links.revoke(args.name)
             print(f"lien de {args.name} révoqué")
+        elif args.link_command == "block":
+            links.block(args.name)
+            print(f"accès de {args.name} bloqué (lien coupé, plus de création auto)")
         else:
             print("\n".join(links.names()))
     except LinkError as e:
@@ -191,6 +194,7 @@ def _parser() -> argparse.ArgumentParser:
     link.add_parser("add", help="crée un lien (affiché une seule fois)").add_argument("name")
     link.add_parser("list", help="noms des liens actifs")
     link.add_parser("revoke", help="révoque un lien").add_argument("name")
+    link.add_parser("block", help="coupe et bloque un nom, même sans lien (ex. <pseudo>-jeu)").add_argument("name")
     sub.add_parser("ask", help="pose une question en console").add_argument("question")
     sub.add_parser("extract", help="données exactes depuis les jars").add_argument(
         "--no-vanilla-fr", action="store_true", help="ne pas télécharger les noms FR vanilla"

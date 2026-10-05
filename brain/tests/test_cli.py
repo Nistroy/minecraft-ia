@@ -80,6 +80,8 @@ def test_mcp_link_add_list_revoke(tmp_path, kb_root, capsys):
     assert main(["--config", str(cfg), "mcp-link", "revoke", "bob"]) == 0
     assert main(["--config", str(cfg), "mcp-link", "revoke", "bob"]) == 2
     assert "bob" in capsys.readouterr().err
+    assert main(["--config", str(cfg), "mcp-link", "block", "bob-jeu"]) == 0
+    assert "bloqué" in capsys.readouterr().out
 
 
 def test_ask_prints_answer_and_sources(tmp_path, kb_root, capsys):
